@@ -27,7 +27,6 @@ Each release archive contains everything you need to start generating:
 ```
 flow-sdk-<version>-<platform>.zip
 ├── flow.exe              Instruction stream generator CLI
-├── flow_validate.exe     Script validator — check .flow and .rules files
 ├── include/flow/isa/     ISA SDK headers (MIT) — build your own ISA plugin
 ├── sdk/cmake/            CMake helpers for plugin projects
 ├── sdk/docs/             Plugin authoring guide
@@ -44,7 +43,7 @@ flow-sdk-<version>-<platform>.zip
 
 👉 **[Latest release →](../../releases/latest)**
 
-Platform packages available: **Windows (x64)** · **Linux (x86-64)** · **macOS (arm64 / x86-64)**
+Platform packages available: **Windows (x64)** · **Linux (x86-64)**
 
 ---
 
@@ -74,12 +73,6 @@ plugin `.so` / `.dll` from the SDK headers and load it at runtime:
 
 ```bash
 flow --plugin path/to/my_isa.so  my_test.flow
-```
-
-### 3 — Validate a script before running
-
-```bash
-flow_validate my_test.flow
 ```
 
 ---
@@ -150,6 +143,11 @@ flow [options] <script.flow>
 Note: --plugin and --isa-dir are mutually exclusive.
 ```
 
+> **Coming soon — `flow_validate`**  
+> A standalone script validator that checks `.flow` and `.rules` files for
+> grammar errors without running the generator. It will be included in a
+> future release.
+
 ---
 
 ## License
@@ -157,7 +155,7 @@ Note: --plugin and --isa-dir are mutually exclusive.
 | Component | License |
 |---|---|
 | SDK headers, CMake helpers, docs, templates | **MIT** — use, modify, redistribute freely |
-| `flow.exe`, `flow_validate.exe` | **Proprietary** — use freely, do not redistribute |
+| `flow.exe` | **Proprietary** — use freely, do not redistribute |
 
 Plugins you build against the SDK headers are entirely your own work.
 See `LICENSE`, `LICENSE-BIN`, and `NOTICE` inside the archive for the full terms.
