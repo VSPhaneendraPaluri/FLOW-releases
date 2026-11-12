@@ -14,14 +14,20 @@ Read this file first; full license text is in LICENSE and LICENSE-BIN.
 │ sdk/templates/      (templates) │ MIT — see LICENSE                        │
 │ sdk/examples/       (examples)  │ MIT — see LICENSE                        │
 ├─────────────────────────────────┼──────────────────────────────────────────┤
-│ flow.exe                        │ Proprietary — see LICENSE-BIN            │
-│ flow_validate.exe               │ Proprietary — see LICENSE-BIN            │
+│ Engine binaries  (bin/)         │ Proprietary — see LICENSE-BIN            │
+│   flow-<platform>-<arch>[.exe]  │                                          │
+│   flow_validate-<platform>      │                                          │
+│           -<arch>[.exe]         │                                          │
 └─────────────────────────────────┴──────────────────────────────────────────┘
+
+Binaries ship for every supported platform inside bin/; current platforms:
+  linux-x86_64   flow-linux-x86_64, flow_validate-linux-x86_64
+  windows-x86_64 flow-windows-x86_64.exe, flow_validate-windows-x86_64.exe
 
 QUICK GUIDE FOR PLUGIN AUTHORS
   ✔  Use, modify, and redistribute the SDK headers freely (MIT).
   ✔  Your ISA plugin (.so / .dll) is entirely your own work.
-  ✔  Run flow.exe in your own verification workflows.
+  ✔  Run the platform binary for your OS in your own verification workflows.
   ✘  Do not redistribute or reverse-engineer the engine binaries.
 
 ATTRIBUTION (appreciated, not required)

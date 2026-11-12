@@ -41,11 +41,12 @@ ENGINE BINARY
 ────────────────────────────────────────────────────────────────────────────────
 
 Every release archive in this repository also includes pre-built FLOW engine
-binaries:
+binaries for each supported platform:
 
-  flow.exe / flow            — Instruction stream generator CLI
-  flow_validate.exe / flow_validate
-                             — Script validator CLI
+  flow-<platform>-<arch>[.exe]           — Instruction stream generator CLI
+  flow_validate-<platform>-<arch>[.exe]  — Script validator CLI
+
+(e.g. flow-linux-x86_64, flow-windows-x86_64.exe)
 
 These binaries are NOT covered by the MIT License above. They are proprietary
 and governed by the separate Binary License — see LICENSE-BIN.

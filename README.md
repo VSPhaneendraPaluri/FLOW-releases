@@ -26,14 +26,18 @@ Each release archive contains everything you need to start generating:
 
 ```
 flow-sdk-<version>-<platform>.zip
-├── flow.exe              Instruction stream generator CLI
+├── bin/
+│   ├── flow-linux-x86_64                Linux x86-64 generator CLI
+│   ├── flow-windows-x86_64.exe          Windows x86-64 generator CLI
+│   ├── flow_validate-linux-x86_64       Linux x86-64 grammar validator
+│   └── flow_validate-windows-x86_64.exe Windows x86-64 grammar validator
 ├── include/flow/isa/     ISA SDK headers (MIT) — build your own ISA plugin
-├── sdk/cmake/            CMake helpers for plugin projects
-├── sdk/docs/             Plugin authoring guide
-├── sdk/templates/        Starter templates — copy and customise
-├── sdk/examples/         Worked example (toy ISA, all tiers)
+├── cmake/                CMake helpers for plugin projects
+├── docs/                 Plugin authoring guide
+├── templates/            Starter templates — copy and customise
+├── examples/             Worked example (toy ISA, all tiers)
 ├── LICENSE               MIT license (SDK)
-├── LICENSE-BIN           Binary license (flow.exe, flow_validate.exe)
+├── LICENSE-BIN           Binary license (platform binaries)
 └── NOTICE                Plain-English license summary
 ```
 
@@ -43,7 +47,7 @@ flow-sdk-<version>-<platform>.zip
 
 👉 **[Latest release →](../../releases/latest)**
 
-Platform packages available: **Windows (x64)** · **Linux (x86-64)**
+Both **Windows (x64)** and **Linux (x86-64)** binaries are included in every archive.
 
 ---
 
@@ -143,10 +147,23 @@ flow [options] <script.flow>
 Note: --plugin and --isa-dir are mutually exclusive.
 ```
 
-> **Coming soon — `flow_validate`**  
-> A standalone script validator that checks `.flow` and `.rules` files for
-> grammar errors without running the generator. It will be included in a
-> future release.
+**`flow_validate`** is included in every release archive alongside `flow`.
+It checks `.flow` and `.rules` files for grammar errors without running the
+generator — useful in CI or as a pre-flight check before a full run.
+
+Pick the binary for your platform from `bin/` and run it directly (or add
+`bin/` to your `PATH` after renaming to taste):
+
+```bash
+# Linux
+./flow_validate-linux-x86_64 my_test.flow
+./flow_validate-linux-x86_64 *.flow        # batch-validate multiple scripts
+
+# Windows (PowerShell / cmd)
+.\flow_validate-windows-x86_64.exe my_test.flow
+```
+
+Exit code 0 = all clean; non-zero = one or more errors (reported to stderr).
 
 ---
 
@@ -155,7 +172,7 @@ Note: --plugin and --isa-dir are mutually exclusive.
 | Component | License |
 |---|---|
 | SDK headers, CMake helpers, docs, templates | **MIT** — use, modify, redistribute freely |
-| `flow.exe` | **Proprietary** — use freely, do not redistribute |
+| `flow-*`, `flow_validate-*` (all platform binaries) | **Proprietary** — use freely, do not redistribute |
 
 Plugins you build against the SDK headers are entirely your own work.
 See `LICENSE`, `LICENSE-BIN`, and `NOTICE` inside the archive for the full terms.
