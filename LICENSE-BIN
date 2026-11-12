@@ -1,0 +1,56 @@
+FLOW Engine Binary License
+===========================
+Copyright (c) 2024-2026 Phaneendra Paluri. All rights reserved.
+
+This license governs the pre-built FLOW engine binaries included in every
+release archive:
+
+  flow.exe / flow            Instruction stream generator
+  flow_validate.exe / flow_validate
+                             Script validator
+
+The FLOW ISA SDK headers and helpers in the same archive are MIT-licensed.
+See LICENSE for those terms.
+
+────────────────────────────────────────────────────────────────────────────────
+1. GRANT OF USE
+────────────────────────────────────────────────────────────────────────────────
+
+You are granted a non-exclusive, non-transferable, royalty-free right to:
+
+  a) Install and run the FLOW binary on systems you own or control.
+  b) Use FLOW in any verification, simulation, or performance-analysis workflow,
+     whether personal, academic, or commercial.
+  c) Invoke the FLOW binary from scripts, CI pipelines, or build systems.
+
+────────────────────────────────────────────────────────────────────────────────
+2. RESTRICTIONS
+────────────────────────────────────────────────────────────────────────────────
+
+Without prior written permission you may NOT:
+
+  a) Redistribute, sublicense, sell, or transfer the FLOW binary to a third
+     party.
+  b) Reverse-engineer, decompile, or disassemble the binary.
+  c) Modify the binary or create derivative works from it.
+  d) Remove or alter any copyright or attribution notice.
+  e) Use the FLOW name or Phaneendra Paluri's name to endorse products derived
+     from this software.
+
+────────────────────────────────────────────────────────────────────────────────
+3. PRE-RELEASE NOTICE
+────────────────────────────────────────────────────────────────────────────────
+
+FLOW is pre-release (SDK API 0.x). Plugin-API breaking changes may occur at
+any minor version until v1.0.0 is tagged.
+
+────────────────────────────────────────────────────────────────────────────────
+4. DISCLAIMER
+────────────────────────────────────────────────────────────────────────────────
+
+THE BINARY IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND. IN NO EVENT SHALL
+THE COPYRIGHT HOLDER BE LIABLE FOR ANY DAMAGES ARISING FROM ITS USE.
+
+────────────────────────────────────────────────────────────────────────────────
+
+Permission requests: pvs.myworks@gmail.com
