@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FLOW — Instruction Stream Generator</title>
 <!-- SEO -->
-<meta name="description" content="FLOW is an ISA-agnostic constrained-random instruction stream generator for CPU architects and SoC simulation. MIT-licensed SDK. Works with RISC-V, custom ISAs, SystemC/TLM2, and any virtual prototype.">
+<meta name="description" content="FLOW is an ISA-agnostic constrained-random instruction stream generator for CPU architects and SoC simulation. MIT-licensed SDK. Works with any ISA, SystemC/TLM2, and any virtual prototype.">
 <!-- Open Graph -->
 <meta property="og:title" content="FLOW — Instruction Stream Generator">
 <meta property="og:description" content="Generate legal, varied CPU instruction sequences from a constraint script. ISA-agnostic, seed-reproducible, MIT SDK. Built for SoC architects and VP authors.">
@@ -390,6 +390,11 @@ code {
   margin-top: 1px;
 }
 .qs-step-body { flex: 1; min-width: 0; }
+.qs-note {
+  margin: 6px 0 0; font-size: 0.75rem; color: var(--muted);
+  line-height: 1.5;
+}
+.qs-note code { font-size: 0.75em; }
 .qs-step-label { font-size: 0.82rem; font-weight: 600; color: var(--text); margin-bottom: 6px; }
 .codeblock-wrap { }
 .codeblock-bar {
@@ -477,6 +482,156 @@ footer a:hover { text-decoration: underline; }
   .cursor { animation: none; opacity: 1; }
   .tier-start { animation: none; }
 }
+
+
+/* ── FLOW LANGUAGE SHOWCASE ── */
+.flow-showcase {
+  background: #060E1C; border: 1px solid var(--border);
+  border-radius: 6px; overflow: hidden; margin-top: 32px;
+  position: relative;
+}
+.flow-showcase-bar {
+  background: var(--surface); padding: 9px 16px;
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono); font-size: 0.72rem; color: var(--muted);
+}
+.flow-showcase-bar .fsdot { width: 9px; height: 9px; border-radius: 50%; background: #263348; }
+.flow-showcase-body {
+  padding: 20px 24px; font-family: var(--mono); font-size: 0.8rem;
+  line-height: 1.9; white-space: pre; overflow-x: auto;
+}
+.fk  { color: var(--purple); }
+.fn  { color: var(--amber); }
+.fm  { color: var(--accent); }
+.fr  { color: var(--teal); }
+.fcm { color: #2D4A68; }
+.fs  { color: var(--text); }
+
+/* ── COPY BUTTON ── */
+.codeblock-wrap { position: relative; }
+.copy-btn {
+  position: absolute; top: 7px; right: 8px;
+  background: rgba(21,37,64,0.95); border: 1px solid var(--border);
+  border-radius: 4px; padding: 4px 9px; cursor: pointer;
+  font-family: var(--mono); font-size: 0.65rem; color: var(--muted);
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: color 0.15s, border-color 0.15s; z-index: 2;
+  line-height: 1; white-space: nowrap; user-select: none;
+}
+.copy-btn:hover { color: var(--text); border-color: var(--muted); }
+.copy-btn.copied { color: var(--teal); border-color: rgba(34,184,153,0.5); }
+
+/* ── WHY FLOW ── */
+.why-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+  background: var(--border); border-radius: 6px; overflow: hidden;
+  margin-top: 40px;
+}
+.why-col { background: var(--surface); padding: 26px 24px; }
+.why-col h3 { font-family: var(--mono); font-size: 0.84rem; margin-bottom: 16px; }
+.why-h-before { color: var(--muted); }
+.why-h-after  { color: var(--teal); }
+.why-list li code {
+  display: inline; font-size: 0.78em;
+  background: rgba(34,184,153,0.1); color: var(--teal);
+  border: 1px solid rgba(34,184,153,0.22); border-radius: 3px;
+  padding: 1px 5px; white-space: nowrap; vertical-align: baseline;
+}
+.why-list { list-style: none; display: flex; flex-direction: column; gap: 11px; }
+.why-list li {
+  font-size: 0.84rem; color: var(--muted);
+  position: relative; padding-left: 16px; line-height: 1.6;
+}
+.why-list li::before {
+  content: ''; position: absolute; left: 0; top: 8px;
+  width: 5px; height: 5px; border-radius: 50%;
+}
+.why-col.before-col .why-list li::before { background: #2D4060; }
+.why-col.after-col  .why-list li::before { background: var(--teal); box-shadow: 0 0 5px rgba(34,184,153,0.5); }
+.why-col.after-col  .why-list li { color: var(--text); }
+@media (max-width: 600px) { .why-row { grid-template-columns: 1fr; } }
+
+/* ── AUTHOR ── */
+#author { background: var(--surface); }
+.author-inner {
+  display: grid; grid-template-columns: auto 1fr; gap: 40px; align-items: flex-start;
+}
+.author-avatar {
+  width: 72px; height: 72px; border-radius: 6px;
+  background: linear-gradient(135deg, rgba(34,184,153,0.15) 0%, rgba(61,142,240,0.1) 100%);
+  border: 1px solid rgba(34,184,153,0.3);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 1.5rem; font-weight: 600; color: var(--teal);
+  flex-shrink: 0;
+}
+.author-name { font-family: var(--mono); font-weight: 600; font-size: 1.1rem; color: #E8F0FB; margin-bottom: 4px; }
+.author-title { font-size: 0.84rem; color: var(--muted); margin-bottom: 14px; max-width: none; }
+.author-bio { font-size: 0.9rem; color: var(--muted); line-height: 1.72; max-width: 60ch; margin-bottom: 10px; }
+.author-links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.author-link {
+  font-family: var(--mono); font-size: 0.78rem; color: var(--accent);
+  border: 1px solid rgba(61,142,240,0.35); border-radius: 4px; padding: 5px 12px;
+  text-decoration: none; transition: all 0.15s;
+}
+.author-link:hover { border-color: var(--accent); color: #E8F0FB; }
+.blog-series { margin-top: 22px; }
+.blog-series-label {
+  font-family: var(--mono); font-size: 0.69rem; color: var(--teal);
+  letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px;
+}
+.blog-posts { display: flex; flex-direction: column; gap: 8px; }
+.blog-post-link {
+  font-size: 0.84rem; color: var(--accent); text-decoration: none;
+  display: flex; align-items: center; gap: 10px; line-height: 1.4;
+}
+.blog-post-link::before {
+  content: ''; width: 4px; height: 4px; border-radius: 50%;
+  background: rgba(61,142,240,0.6); flex-shrink: 0;
+}
+.blog-post-link:hover { text-decoration: underline; }
+@media (max-width: 600px) { .author-inner { grid-template-columns: 1fr; } }
+
+
+/* ── DOWNLOAD DROPDOWN ── */
+.dl-dropdown { position: relative; display: inline-block; }
+.dl-trigger {
+  display: flex; align-items: center; gap: 7px; cursor: pointer;
+  border: none; outline: none;
+}
+.dl-caret {
+  display: inline-block; width: 0; height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  transition: transform 0.18s;
+}
+.dl-dropdown.open .dl-caret { transform: rotate(180deg); }
+.dl-menu {
+  position: absolute; top: calc(100% + 6px); left: 0;
+  min-width: 220px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 6px;
+  overflow: hidden; z-index: 100;
+  opacity: 0; transform: translateY(-6px); pointer-events: none;
+  transition: opacity 0.14s, transform 0.14s;
+}
+.dl-dropdown.open .dl-menu {
+  opacity: 1; transform: translateY(0); pointer-events: auto;
+}
+/* nav dropdown aligns to right edge of trigger */
+.dl-menu-right { left: auto; right: 0; }
+.dl-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; text-decoration: none;
+  font-family: var(--mono); font-size: 0.8rem; color: var(--text);
+  border-bottom: 1px solid var(--border); transition: background 0.1s;
+}
+.dl-item:last-child { border-bottom: none; }
+.dl-item:hover { background: rgba(61,142,240,0.08); }
+.dl-item-os { color: var(--text); }
+.dl-item-arch { color: var(--muted); font-size: 0.72rem; }
+.dl-item-all { color: var(--accent); font-size: 0.78rem; }
+
 </style>
 </head>
 <body>
@@ -493,7 +648,31 @@ footer a:hover { text-decoration: underline; }
       <li><a href="#sdk">SDK</a></li>
       <li><a href="https://github.com/VSPhaneendraPaluri/FLOW-releases" target="_blank">GitHub &#x2197;</a></li>
     </ul>
-    <a href="https://github.com/VSPhaneendraPaluri/FLOW-releases/releases/latest" class="btn-nav js-dl-href" target="_blank"><span class="js-dl-text">Download v0.2.2</span></a>
+    <div class="dl-dropdown" id="dl-dropdown">
+      <button class="btn-nav dl-trigger" id="dl-trigger" aria-haspopup="true" aria-expanded="false">
+        <span class="js-dl-text">Download v0.2.2</span>
+        <span class="dl-caret"></span>
+      </button>
+      <div class="dl-menu dl-menu-right" role="menu">
+        <a class="dl-item" id="dl-linux-href"
+           href="https://github.com/VSPhaneendraPaluri/FLOW-releases/releases/latest"
+           target="_blank">
+          <span class="dl-item-os">Linux x86-64</span>
+          <span class="dl-item-arch" id="dl-linux-file">.tar.gz</span>
+        </a>
+        <a class="dl-item" id="dl-win-href"
+           href="https://github.com/VSPhaneendraPaluri/FLOW-releases/releases/latest"
+           target="_blank">
+          <span class="dl-item-os">Windows x86-64</span>
+          <span class="dl-item-arch" id="dl-win-file">.zip</span>
+        </a>
+        <a class="dl-item" id="dl-all-href"
+           href="https://github.com/VSPhaneendraPaluri/FLOW-releases/releases"
+           target="_blank">
+          <span class="dl-item-all">All releases &#x2197;</span>
+        </a>
+      </div>
+    </div>
   </div>
 </nav>
 
@@ -512,7 +691,6 @@ footer a:hover { text-decoration: underline; }
           &mdash; from a small constraint script. Any ISA. Any simulator.
         </p>
         <div class="btn-row">
-          <a href="https://github.com/VSPhaneendraPaluri/FLOW-releases/releases/latest" class="btn btn-primary js-dl-href" target="_blank"><span class="js-dl-text">Download v0.2.2</span></a>
           <a href="https://github.com/VSPhaneendraPaluri/FLOW-releases" class="btn btn-secondary" target="_blank">GitHub &#x2197;</a>
           <a href="https://phaneendra-paluri-dev.onrender.com/blogs/teaching-grammar-to-generate-instructions-introducing-flow" class="btn btn-ghost" target="_blank">Read the blog</a>
         </div>
@@ -595,7 +773,7 @@ footer a:hover { text-decoration: underline; }
         <h3>ISA-agnostic by design</h3>
         <p>FLOW never hard-codes mnemonics, register counts, or encoding rules.
            Every ISA detail arrives at runtime through a plugin &mdash; the same engine
-           runs your RISC-V, custom VLIW, or proprietary microcontroller ISA
+           runs your custom VLIW, fixed-width, or proprietary microcontroller ISA
            without recompilation. No engine build from source required.</p>
       </div>
       <div>
@@ -609,6 +787,44 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
+<!-- ── WHY FLOW ── -->
+<section id="why">
+  <div class="wrap">
+    <div class="slabel">motivation</div>
+    <h2>Why not write a script?</h2>
+    <p>Most teams do &mdash; until the ISA changes, a new SoC variant ships,
+       or the stimulus needs to cover an edge case that hand-written sequences
+       never reach. FLOW makes the right thing easy and the fragile thing unnecessary.</p>
+
+    <div class="why-row">
+      <div class="why-col before-col">
+        <h3 class="why-h-before">Without FLOW</h3>
+        <ul class="why-list">
+          <li>Hand-write assembly sequences for every new test scenario</li>
+          <li>Re-author stimulus for every ISA or SoC variant</li>
+          <li>Register conflicts and illegal encodings caught late in simulation</li>
+          <li>Constrained-random requires a full UVM/SV testbench or bespoke scripts</li>
+          <li>No reproducibility guarantee: different runs produce different sequences</li>
+          <li>Python scaffolding that only one engineer fully understands</li>
+        </ul>
+      </div>
+      <div class="why-col after-col">
+        <h3 class="why-h-after">With FLOW</h3>
+        <ul class="why-list">
+          <li>Write <em>intent</em>, not mechanics &mdash; <code>.flow</code> says what, the engine decides how</li>
+          <li>New ISA in a weekend: one plugin, every existing script runs unchanged</li>
+          <li>Illegal sequences rejected before they reach simulation &mdash; not after</li>
+          <li>Constrained-random in 3 lines: <code>random 32&nbsp; tags:[mem, load]</code></li>
+          <li><code>--seed 42</code> &mdash; bit-identical output on any machine, any engineer</li>
+          <li>Plain-text scripts your whole team can read, review, and fork</li>
+        </ul>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+
 <!-- ── BUILT FOR YOUR STACK ── -->
 <section id="stack">
   <div class="wrap">
@@ -619,10 +835,10 @@ footer a:hover { text-decoration: underline; }
 
     <div class="stack-grid">
       <div class="stack-tile rv">
-        <span class="st-label rv">RISC-V</span>
-        <h3>Any RISC-V variant</h3>
-        <p>Describe a RISC-V base ISA or custom extension set in YAML.
-           Standard and non-standard extensions coexist in the same plugin.
+        <span class="st-label rv">Any ISA</span>
+        <h3>Your ISA, any variant</h3>
+        <p>Describe any fixed- or variable-width ISA in YAML or C++.
+           Base ISA and extensions coexist in the same plugin.
            Under an hour to a working Tier&#x2011;A plugin.</p>
       </div>
       <div class="stack-tile sc">
@@ -663,6 +879,70 @@ footer a:hover { text-decoration: underline; }
     </div>
   </div>
 </section>
+
+<!-- ── THE LANGUAGE ── -->
+<section id="language">
+  <div class="wrap">
+    <div class="slabel">the .flow language</div>
+    <h2>Readable scripts. Reproducible output.</h2>
+    <p>A <code>.flow</code> script expresses simulation intent, not ISA mechanics.
+       Scenes, loops, and inline directives compose naturally.
+       The engine handles constraint solving, register allocation, and random draws
+       &mdash; your script stays readable when the ISA changes.</p>
+
+    <div class="flow-showcase">
+      <div class="flow-showcase-bar">
+        <span class="fsdot"></span><span class="fsdot"></span><span class="fsdot"></span>
+        <span>load_stress.flow</span>
+      </div>
+      <div class="flow-showcase-body"><span class="fcm"># Pull in constraint envelope: reserved regs, global instruction-mix rules</span>
+<span class="fk">include</span> <span class="fs">"myarch.rules"</span>
+
+<span class="fcm"># Directed prologue — exact instructions, exact order</span>
+<span class="fk">scene</span> <span class="fs">boot_sequence</span> {
+  <span class="fk">directed</span> {
+    <span class="fm">MOV</span>    <span class="fr">sp</span>,   <span class="fn">0x1000</span>
+    <span class="fm">ADD</span>    <span class="fr">r1</span>,   <span class="fr">r0</span>,   <span class="fn">0</span>
+    <span class="fm">LDI</span>    <span class="fr">r2</span>,   <span class="fn">0xDEAD</span>
+  }
+}
+
+<span class="fcm"># Constrained-random: 32 instructions, only mem-tagged, no FENCE or ECALL</span>
+<span class="fk">scene</span> <span class="fs">load_stress</span> {
+  <span class="fk">random</span>  <span class="fn">32</span>
+  <span class="fk">tags</span>:    [<span class="fr">mem</span>, <span class="fr">load</span>]
+  <span class="fk">exclude</span>: [<span class="fm">HALT</span>, <span class="fm">NOP</span>]
+}
+
+<span class="fcm"># Compose: 4 iterations of load stress + 8 ALU instructions per loop</span>
+<span class="fk">loop</span> <span class="fn">4</span> {
+  <span class="fk">scene</span> <span class="fs">load_stress</span>
+  <span class="fk">random</span> <span class="fn">8</span>  <span class="fk">tags</span>: [<span class="fr">alu</span>]
+}
+
+<span class="fcm"># Directed epilogue</span>
+<span class="fk">scene</span> <span class="fs">teardown</span> {
+  <span class="fk">directed</span> { <span class="fm">JMP</span> .fini }
+}</div>
+    </div>
+
+    <div class="two-col" style="margin-top:40px">
+      <div>
+        <h3>Scenes and scripts</h3>
+        <p>A <code>scene</code> is a named, reusable sequence of instructions.
+           Scripts compose scenes, loops, and inline directives &mdash;
+           the same scene works across any ISA that exposes matching tags.</p>
+      </div>
+      <div>
+        <h3>Constraint envelope</h3>
+        <p>A <code>.rules</code> file defines the envelope: reserved registers,
+           global instruction-mix ratios, and locked constraints.
+           Scripts inherit the envelope and cannot violate it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 
 <!-- ── TIERS ── -->
 <section id="tiers">
@@ -725,6 +1005,8 @@ footer a:hover { text-decoration: underline; }
           <h3>Zero-C++ path</h3>
           <p>Place two YAML files in a directory and point FLOW at it.
              No compiler, no build step. The fastest path to running output.</p>
+          <p class="qs-note">&#9432;&nbsp; Both files must follow the FLOW YAML schema &mdash;
+             see <code>sdk/docs/yaml-plugin.md</code> in the SDK for the full field reference.</p>
         </div>
         <div class="qs-steps">
           <div class="qs-step">
@@ -817,7 +1099,7 @@ footer a:hover { text-decoration: underline; }
       <h3 style="margin-bottom:14px">Three workflow roles</h3>
       <div class="roles">
         <div class="role">
-          <div class="role-art">my_isa.so / data/*.yml</div>
+          <div class="role-art">plugin.so &nbsp;or&nbsp; *.yml</div>
           <h3>ISA plugin author</h3>
           <p>Write the instruction table, register file, and optional encoding hooks.
              Your plugin is entirely your own work under MIT headers &mdash;
@@ -898,6 +1180,44 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
+<!-- ── AUTHOR ── -->
+<section id="author">
+  <div class="wrap">
+    <div class="slabel">built by</div>
+    <div class="author-inner">
+      <div class="author-avatar">PP</div>
+      <div>
+        <div class="author-name">Phaneendra Paluri</div>
+        <p class="author-title">Virtual prototyping &middot; SoC modelling &middot; C++ systems &middot; processor architecture</p>
+        <p class="author-bio">
+          Built FLOW after spending years authoring simulation stimulus by hand for
+          SystemC/TLM2 virtual platforms and custom ISA models. The same cold-start
+          problem repeated on every new SoC variant: working simulation model, no
+          scalable way to exercise it. FLOW is the tool that should have existed.
+        </p>
+        <p class="author-bio">
+          The design is documented in a blog series written alongside the
+          implementation &mdash; from motivation and grammar design through the
+          plugin contract, constrained-random generation, and structural constructs.
+        </p>
+        <div class="author-links">
+          <a class="author-link" href="https://phaneendra-paluri-dev.onrender.com" target="_blank">Blog &#x2197;</a>
+          <a class="author-link" href="https://github.com/VSPhaneendraPaluri/FLOW-releases" target="_blank">GitHub &#x2197;</a>
+        </div>
+        <div class="blog-series">
+          <div class="blog-series-label">blog series</div>
+          <div class="blog-posts">
+            <a class="blog-post-link"
+               href="https://phaneendra-paluri-dev.onrender.com/blogs/teaching-grammar-to-generate-instructions-introducing-flow"
+               target="_blank">Teaching grammar to generate instructions &mdash; introducing FLOW &#x2197;</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
 <!-- ── FOOTER ── -->
 <footer>
   <div class="wrap">
@@ -946,6 +1266,25 @@ footer a:hover { text-decoration: underline; }
     document.querySelectorAll('.js-dl-href').forEach(function(el) {
       el.href = url;
     });
+    // dropdown: also update the "all releases" fallback href with the latest URL
+    var allHref = document.getElementById('dl-all-href');
+    // populate per-platform dropdown items from release assets
+    var assets = rel.assets || [];
+    function fmtAssetName(name) {
+      // show just extension for compact display
+      var m = name.match(/\.(tar\.gz|zip|gz|tar)$/i);
+      return m ? m[0] : name;
+    }
+    assets.forEach(function(a) {
+      var n = (a.name || '').toLowerCase();
+      var p = n.indexOf('linux') !== -1 ? 'linux' :
+              (n.indexOf('windows') !== -1 || n.indexOf('win') !== -1) ? 'win' : null;
+      if (!p) return;
+      var archEl = document.getElementById('dl-'+p+'-file');
+      var hrefEl = document.getElementById('dl-'+p+'-href');
+      if (archEl) archEl.textContent = fmtAssetName(a.name);
+      if (hrefEl) hrefEl.href = a.browser_download_url || url;
+    });
   })
   .catch(function() { /* leave hardcoded fallback text in place */ });
 })();
@@ -992,6 +1331,83 @@ function addInsn() {
 
 addInsn();
 setInterval(addInsn, 860);
+</script>
+
+<script>
+// ── Copy-to-clipboard buttons ────────────────────────────────────────────
+(function () {
+  var COPY_SVG = '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M11 5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v7a1 1 0 001 1h2" stroke="currentColor" stroke-width="1.6"/></svg>';
+  var CHECK_SVG = '<svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function makeBtn(getText) {
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.setAttribute('aria-label', 'Copy code');
+    btn.innerHTML = COPY_SVG + ' copy';
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var text = getText();
+      navigator.clipboard.writeText(text).then(function() {
+        btn.className = 'copy-btn copied';
+        btn.innerHTML = CHECK_SVG + ' copied';
+        setTimeout(function() {
+          btn.className = 'copy-btn';
+          btn.innerHTML = COPY_SVG + ' copy';
+        }, 1800);
+      }).catch(function() {});
+    });
+    return btn;
+  }
+
+  // .codeblock-wrap containers (Quick Start steps)
+  document.querySelectorAll('.codeblock-wrap').forEach(function(wrap) {
+    var cb = wrap.querySelector('.codeblock');
+    if (!cb) return;
+    var btn = makeBtn(function() { return (cb.innerText || cb.textContent || '').trim(); });
+    wrap.appendChild(btn);
+  });
+
+  // standalone .codeblock not inside a .codeblock-wrap
+  document.querySelectorAll('.codeblock').forEach(function(cb) {
+    if (cb.closest('.codeblock-wrap')) return;
+    cb.style.position = 'relative';
+    var btn = makeBtn(function() { return (cb.innerText || cb.textContent || '').trim(); });
+    cb.appendChild(btn);
+  });
+
+  // .flow-showcase
+  document.querySelectorAll('.flow-showcase').forEach(function(fs) {
+    var body = fs.querySelector('.flow-showcase-body');
+    if (!body) return;
+    var btn = makeBtn(function() { return (body.innerText || body.textContent || '').trim(); });
+    fs.appendChild(btn);
+  });
+})();
+</script>
+
+<script>
+// ── Download dropdown toggle ───────────────────────────────────────────────
+(function () {
+  var dd = document.getElementById('dl-dropdown');
+  var trigger = document.getElementById('dl-trigger');
+  if (!dd || !trigger) return;
+
+  function open()  { dd.classList.add('open');    trigger.setAttribute('aria-expanded', 'true');  }
+  function close() { dd.classList.remove('open'); trigger.setAttribute('aria-expanded', 'false'); }
+
+  trigger.addEventListener('click', function(e) {
+    e.stopPropagation();
+    dd.classList.contains('open') ? close() : open();
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!dd.contains(e.target)) close();
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') close();
+  });
+})();
 </script>
 </body>
 </html>
