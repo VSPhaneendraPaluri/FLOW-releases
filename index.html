@@ -920,6 +920,38 @@ footer a:hover { text-decoration: underline; }
 </footer>
 
 <script>
+// ── Auto-fetch latest release from GitHub ─────────────────────────────────
+(function () {
+  const REPO = 'VSPhaneendraPaluri/FLOW-releases';
+  fetch('https://api.github.com/repos/' + REPO + '/releases/latest', {
+    headers: { 'Accept': 'application/vnd.github+json' }
+  })
+  .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+  .then(function(rel) {
+    var tag  = rel.tag_name  || '';          // e.g. "v0.2.3"
+    var url  = rel.html_url  || ('https://github.com/' + REPO + '/releases/latest');
+    // version badge in hero tag
+    document.querySelectorAll('.js-ver-tag').forEach(function(el) {
+      el.textContent = tag;
+    });
+    // "Download vX.Y.Z" button text
+    document.querySelectorAll('.js-dl-text').forEach(function(el) {
+      el.textContent = 'Download ' + tag;
+    });
+    // footer "Download vX.Y.Z ↗" link text
+    document.querySelectorAll('.js-footer-dl').forEach(function(el) {
+      el.textContent = 'Download ' + tag + ' ↗';
+    });
+    // href on all download buttons / links
+    document.querySelectorAll('.js-dl-href').forEach(function(el) {
+      el.href = url;
+    });
+  })
+  .catch(function() { /* leave hardcoded fallback text in place */ });
+})();
+</script>
+
+<script>
 const insns = [
   ['ADD ', 'r1, r2, r3   ', '; alu'],
   ['ADDI', 'r4, r1, 42   ', '; alu'],

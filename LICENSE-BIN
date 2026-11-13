@@ -3,11 +3,12 @@ FLOW Engine Binary License
 Copyright (c) 2024-2026 Phaneendra Paluri. All rights reserved.
 
 This license governs the pre-built FLOW engine binaries included in every
-release archive:
+release archive. Binaries are named with a platform suffix:
 
-  flow.exe / flow            Instruction stream generator
-  flow_validate.exe / flow_validate
-                             Script validator
+  flow-<platform>-<arch>[.exe]           Instruction stream generator
+  flow_validate-<platform>-<arch>[.exe]  Script validator
+
+(e.g. flow-linux-x86_64, flow-windows-x86_64.exe)
 
 The FLOW ISA SDK headers and helpers in the same archive are MIT-licensed.
 See LICENSE for those terms.
