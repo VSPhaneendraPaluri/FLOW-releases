@@ -183,6 +183,8 @@ See `LICENSE`, `LICENSE-BIN`, and `NOTICE` in the archive for the full terms.
 |---|---|
 | TableGen import — generate a YAML plugin from an existing LLVM `.td` file | Planned |
 
+See [ROADMAP.md](ROADMAP.md) for the full picture — what is in progress, planned, and under consideration.
+
 > Have a specific ISA or use case in mind? Open an issue — it helps prioritise.
 
 ---
