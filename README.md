@@ -1,43 +1,45 @@
 # FLOW — Instruction Stream Generator
 
-> **Generate legal, varied CPU instruction streams from a simple script.**  
-> No ISA hard-coding. No boilerplate. Reproducible by seed.
+> **Write what you want to run. FLOW generates what the architecture allows.**
 
-FLOW is a ready-to-run tool for CPU verification engineers and SoC architects
-who need high-quality instruction sequences — directed, constrained-random, or
-mixed — without writing a custom generator for every new architecture.
+FLOW is an instruction stream generator for CPU modelling, virtual prototyping,
+and SoC platform simulation. Describe your architecture and address space — FLOW
+produces legal, varied, seed-reproducible instruction sequences for any ISA and
+any platform. No generator to maintain. No boilerplate to rebuild when the
+architecture changes.
 
 ---
 
-## Who is FLOW for?
+## Who uses FLOW?
 
-| You are… | FLOW lets you… |
+| You are… | FLOW gives you… |
 |---|---|
-| **CPU / SoC verification engineer** | Generate targeted instruction streams for your DUT without maintaining a bespoke generator |
-| **Performance architect** | Produce realistic workload mixes to stress your micro-architecture |
-| **ISA designer** | Validate your instruction set definition early — before RTL is complete |
-| **Simulation engineer** | Feed instruction sequences into ISSs, cycle-accurate models, or emulators |
+| **Virtual prototyping / CPU modelling engineer** | Realistic instruction traffic for your ISS or cycle-accurate model — across ISA variants, without rebuilding the generator each time |
+| **SoC platform engineer** | Workload sequences that respect your platform's address map — legal load/store traffic for cache, interconnect, and power stress |
+| **Performance architect** | Repeatable, seed-fixed workload mixes to characterise and compare micro-architecture models across runs and teams |
+| **ISA designer** | Instruction generation before RTL or simulation is complete — validate the architecture definition as you author it |
+| **CPU / SoC verification engineer** | Directed and constrained-random streams for DUT stimulus, with guaranteed legality and bit-exact reproducibility |
 
 ---
 
 ## What is in a release?
 
-Each release archive contains everything you need to start generating:
+Each archive contains everything you need:
 
 ```
 flow-sdk-<version>-<platform>.zip
 ├── bin/
-│   ├── flow-linux-x86_64                Linux x86-64 generator CLI
-│   ├── flow-windows-x86_64.exe          Windows x86-64 generator CLI
-│   ├── flow_validate-linux-x86_64       Linux x86-64 grammar validator
-│   └── flow_validate-windows-x86_64.exe Windows x86-64 grammar validator
-├── include/flow/isa/     ISA SDK headers (MIT) — build your own ISA plugin
-├── cmake/                CMake helpers for plugin projects
+│   ├── flow-linux-x86_64                  Linux x86-64 generator CLI
+│   ├── flow-windows-x86_64.exe            Windows x86-64 generator CLI
+│   ├── flow_validate-linux-x86_64         Linux x86-64 script validator
+│   └── flow_validate-windows-x86_64.exe   Windows x86-64 script validator
+├── include/flow/isa/     ISA SDK headers (MIT-licensed)
+├── cmake/                CMake helpers for building ISA plugins
 ├── docs/                 Plugin authoring guide
-├── templates/            Starter templates — copy and customise
-├── examples/             Worked example (toy ISA, all tiers)
+├── templates/            Starter plugin templates
+├── examples/             Worked example with a toy ISA
 ├── LICENSE               MIT license (SDK)
-├── LICENSE-BIN           Binary license (platform binaries)
+├── LICENSE-BIN           Binary terms (platform binaries)
 └── NOTICE                Plain-English license summary
 ```
 
@@ -47,15 +49,15 @@ flow-sdk-<version>-<platform>.zip
 
 👉 **[Latest release →](../../releases/latest)**
 
-Both **Windows (x64)** and **Linux (x86-64)** binaries are included in every archive.
+Both **Linux (x86-64)** and **Windows (x64)** binaries ship in every archive.
 
 ---
 
 ## Quick Start
 
-### 1 — Run against a YAML ISA definition (zero C++)
+### Zero C++ — YAML ISA definition
 
-The fastest path. Describe your ISA in two YAML files and point FLOW at them:
+Describe your ISA in two files and point FLOW at them. No build step required.
 
 ```
 my_isa/
@@ -67,13 +69,13 @@ my_isa/
 flow --isa-dir my_isa/  my_test.flow
 ```
 
-That is all. FLOW loads your ISA, parses the script, and streams assembly to
-stdout (or `--output <file>`).
+> YAML files must follow the FLOW schema — see `sdk/docs/yaml-plugin.md` in
+> the archive for the full field reference.
 
-### 2 — Run against a compiled ISA plugin
+### Compiled ISA plugin
 
 For architectures with custom encodings or cross-operand constraints, build a
-plugin `.so` / `.dll` from the SDK headers and load it at runtime:
+plugin from the MIT-licensed SDK headers and load it at runtime:
 
 ```bash
 flow --plugin path/to/my_isa.so  my_test.flow
@@ -81,53 +83,54 @@ flow --plugin path/to/my_isa.so  my_test.flow
 
 ---
 
-## Writing a .flow Script
+## Writing a Script
 
-A `.flow` script expresses *what* to generate — the engine decides *how*:
+A `.flow` script says *what* to generate. The engine decides *how*:
 
 ```
-isa riscv32          # name must match the loaded ISA
+# Directed: exact instructions in the order you specify
+scene boot {
+  directed {
+    MOV  sp, 0x1000
+    ADD  r1, r0, 0
+  }
+}
 
-# Directed: exact sequence you specify
-directed:
-    ADD  x1, x2, x3
-    ADDI x4, x1, 42
+# Constrained-random: engine picks instructions and operands
+scene load_stress {
+  random  32
+  tags:   [mem, load]
+  exclude: [HALT, NOP]
+}
 
-# Random: engine picks instructions and operands
-random(count=100):
-    tags: [alu, load]   # restrict to these instruction categories
-
-# Loop: repeat a block N times
-loop(10):
-    random(count=20):
-        tags: [branch]
+# Compose: loop and mix freely
+loop 4 {
+  scene load_stress
+  random 8  tags: [alu]
+}
 ```
 
-```bash
-flow --isa-dir riscv32/  --seed 42  --count 500  my_test.flow
-```
-
-Fix `--seed` for a reproducible run; omit it for a fresh random stream each time.
+Pass `--seed` for a bit-identical run; omit it for a fresh stream each time.
 
 ---
 
-## ISA Adoption Ladder
+## ISA Adoption Path
 
-FLOW meets your ISA where it is. Start at the tier that fits and step up only
-when you need to:
+Start at the level that fits your architecture and step up only when you need to:
 
-| Tier | C++ needed? | What you write | Typical use |
+| Level | C++ required? | What it covers | Upgrade when… |
 |---|---|---|---|
-| **A** | None | `instructions.yml` + `registers.yml` | Fixed-format ISAs, quick experiments, early validation |
-| **B** | Minimal | YAML + one `.cpp` override | Split immediates, PC-relative branch targets |
-| **C** | Moderate | Tier B + operand-validation hook | Hardwired-zero registers, write-protection rules |
-| **D** | Full | C++ `IsaDefinition` subclass | Exotic encodings, maximum control |
+| **A** | **None** — two YAML files | Full instruction table, register file, instruction tags and mix weights, constrained-random draws, assembly-text output. Sufficient for most standard RISC-style ISAs with independent operands and fixed-width formats. | You need split immediates, PC-relative targets, or binary byte output |
+| **B** | **Minimal** — ~one C++ file | Everything in A, plus an encoding step for split immediates, PC-relative offsets, and packed fields. Produces binary-exact byte streams as well as assembly text. | You need to reject instructions based on the combination of operands chosen |
+| **C** | **Moderate** — B + validation logic | Everything in B, plus cross-operand rules: register write-protection, pipeline hazard exclusions, alignment constraints, instruction-pair restrictions. | You need exotic multi-word formats, instruction side effects, or grammar extensions |
+| **D** | **Full C++** | Complete ISA description in code. Every aspect of the architecture under your control — encoding, side effects, custom grammar constructs. | — |
 
-Tier A requires no compiler at all — just two YAML files next to your `.flow`
-script. Tier D gives you full programmatic control when you need it.
+> **Unsure which level you need?** Most ISAs with fixed-width instructions and independent operands
+> are fully covered by Level A. The common signal to move to B is split immediates; to C is a rule
+> like "destination register must not be the same as the base register."
 
-The SDK headers and CMake helpers for all four tiers are MIT-licensed and
-included in every release archive.
+The SDK headers and CMake helpers for all four levels are MIT-licensed and
+included in every release.
 
 ---
 
@@ -137,33 +140,28 @@ included in every release archive.
 flow [options] <script.flow>
 
   --plugin <path>    Load a compiled ISA plugin (.so / .dll)
-  --isa-dir <path>   Load a pure-YAML ISA from a directory
+  --isa-dir <path>   Load a YAML ISA from a directory
   --isa <name>       Override the ISA name
   --seed <n>         Fix the RNG seed for reproducible output
   --count <n>        Number of instruction sequences to generate
-  --output <file>    Write output to file  (default: stdout)
+  --output <file>    Write output to a file  (default: stdout)
   --help             Print this message
 
 Note: --plugin and --isa-dir are mutually exclusive.
 ```
 
-**`flow_validate`** is included in every release archive alongside `flow`.
-It checks `.flow` and `.rules` files for grammar errors without running the
-generator — useful in CI or as a pre-flight check before a full run.
-
-Pick the binary for your platform from `bin/` and run it directly (or add
-`bin/` to your `PATH` after renaming to taste):
+**`flow_validate`** checks `.flow` and `.rules` files for errors without
+running the generator — useful in CI and as a pre-flight check.
 
 ```bash
 # Linux
 ./flow_validate-linux-x86_64 my_test.flow
-./flow_validate-linux-x86_64 *.flow        # batch-validate multiple scripts
 
-# Windows (PowerShell / cmd)
+# Windows
 .\flow_validate-windows-x86_64.exe my_test.flow
 ```
 
-Exit code 0 = all clean; non-zero = one or more errors (reported to stderr).
+Exit 0 = clean; non-zero = errors reported to stderr.
 
 ---
 
@@ -172,10 +170,20 @@ Exit code 0 = all clean; non-zero = one or more errors (reported to stderr).
 | Component | License |
 |---|---|
 | SDK headers, CMake helpers, docs, templates | **MIT** — use, modify, redistribute freely |
-| `flow-*`, `flow_validate-*` (all platform binaries) | **Proprietary** — use freely, do not redistribute |
+| `flow-*`, `flow_validate-*` (platform binaries) | **Proprietary** — use freely, do not redistribute |
 
 Plugins you build against the SDK headers are entirely your own work.
-See `LICENSE`, `LICENSE-BIN`, and `NOTICE` inside the archive for the full terms.
+See `LICENSE`, `LICENSE-BIN`, and `NOTICE` in the archive for the full terms.
+
+---
+
+## Roadmap
+
+| Item | Status |
+|---|---|
+| TableGen import — generate a YAML plugin from an existing LLVM `.td` file | Planned |
+
+> Have a specific ISA or use case in mind? Open an issue — it helps prioritise.
 
 ---
 
@@ -184,8 +192,8 @@ See `LICENSE`, `LICENSE-BIN`, and `NOTICE` inside the archive for the full terms
 | Link | What you will find |
 |---|---|
 | [Blog series](https://phaneendra-paluri-dev.onrender.com/blogs/teaching-grammar-to-generate-instructions-introducing-flow) | Design motivation, grammar walkthrough, plugin contract, constrained-random generation |
-| [SDK docs](sdk/docs/writing_an_isa.md) *(in archive)* | Full plugin authoring guide — all four tiers with examples |
-| [Starter template](sdk/templates/yaml_plugin/) *(in archive)* | Copy-and-customise YAML plugin scaffold |
+| [SDK docs](sdk/docs/writing_an_isa.md) *(in archive)* | Full plugin authoring guide — all four levels with worked examples |
+| [Starter template](sdk/templates/plugin_starter/) *(in archive)* | Copy-and-customise C++ or YAML plugin scaffold |
 
 ---
 
@@ -194,4 +202,4 @@ See `LICENSE`, `LICENSE-BIN`, and `NOTICE` inside the archive for the full terms
 FLOW was designed and built by **Phaneendra Paluri**, an experienced professional
 in virtual prototyping — processor and SoC models in C++ and SystemC/TLM-2.
 
-Questions or permission requests: pvs.myworks@gmail.com
+Questions or permission requests: open an issue on this repo.

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FLOW — Instruction Stream Generator</title>
 <!-- SEO -->
-<meta name="description" content="FLOW is an ISA-agnostic constrained-random instruction stream generator for CPU architects and SoC simulation. MIT-licensed SDK. Works with any ISA, SystemC/TLM2, and any virtual prototype.">
+<meta name="description" content="FLOW generates legal, varied instruction sequences for virtual prototyping, SoC platform simulation, and CPU modelling. Describe your architecture and address space — FLOW handles the rest. ISA-agnostic, seed-reproducible, MIT-licensed SDK.">
 <!-- Open Graph -->
 <meta property="og:title" content="FLOW — Instruction Stream Generator">
 <meta property="og:description" content="Generate legal, varied CPU instruction sequences from a constraint script. ISA-agnostic, seed-reproducible, MIT SDK. Built for SoC architects and VP authors.">
@@ -82,6 +82,20 @@ nav ul a:hover { color: var(--text); }
 }
 .btn-nav:hover { background: #2fd4b0; }
 
+/* ── DEV STATUS BANNER ── */
+.dev-banner {
+  background: rgba(255, 185, 0, 0.08);
+  border-bottom: 1px solid rgba(255, 185, 0, 0.25);
+  padding: 10px 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+}
+.dev-banner .wrap { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.dev-banner-icon { font-size: 0.85rem; flex-shrink: 0; }
+.dev-banner-link { color: rgba(255,185,0,0.85); text-decoration: none; white-space: nowrap; border-bottom: 1px solid rgba(255,185,0,0.35); padding-bottom: 1px; transition: color 0.15s; }
+.dev-banner-link:hover { color: rgb(255,185,0); border-bottom-color: rgba(255,185,0,0.7); }
+
 /* ── HERO ── */
 .hero-outer { position: relative; overflow: hidden; }
 .hero-grid {
@@ -92,7 +106,7 @@ nav ul a:hover { color: var(--text); }
   -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black, transparent);
 }
 .hero {
-  padding: 88px 0 72px;
+  padding: 60px 0 48px;
   display: grid; grid-template-columns: 1fr 1fr; gap: 52px; align-items: center;
   position: relative;
 }
@@ -109,7 +123,7 @@ nav ul a:hover { color: var(--text); }
 }
 .hero h1 {
   font-family: var(--mono); font-weight: 600;
-  font-size: clamp(2.1rem, 5vw, 3.5rem);
+  font-size: clamp(1.5rem, 2.6vw, 2.2rem);
   line-height: 1.13; letter-spacing: -0.025em;
   color: #E8F0FB; margin-bottom: 20px;
 }
@@ -349,6 +363,12 @@ code {
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
 .tier h3 { font-size: 0.9375rem; margin-bottom: 6px; }
 .tier p { font-size: 0.8rem; line-height: 1.55; max-width: none; }
+.tier-covers { margin: 10px 0 0; padding: 0; list-style: none; }
+.tier-covers li { font-size: 0.775rem; line-height: 1.5; color: var(--muted); padding: 2px 0 2px 14px; position: relative; }
+.tier-covers li::before { content: "✓"; position: absolute; left: 0; color: var(--teal); font-size: 0.7rem; top: 3px; }
+.tier-covers li.up { color: var(--muted); }
+.tier-covers li.up::before { content: "↑"; color: var(--accent); top: 2px; font-size: 0.75rem; }
+.tier-divider { border: none; border-top: 1px solid var(--border); margin: 10px 0 8px; }
 
 /* ── CODE BLOCKS ── */
 .codeblock {
@@ -406,7 +426,7 @@ code {
 }
 .codeblock-bar .cbdot { width: 8px; height: 8px; border-radius: 50%; background: #263348; flex-shrink: 0; }
 .codeblock-wrap .codeblock { margin-top: 0; border-radius: 0 0 6px 6px; }
-@media (max-width: 740px) { .qs-paths { grid-template-columns: 1fr; } }
+/* .qs-paths responsive handled in main breakpoint block */
 
 /* ── ROLES ── */
 .roles {
@@ -461,23 +481,155 @@ footer a:hover { text-decoration: underline; }
 }
 
 /* ── RESPONSIVE ── */
-@media (max-width: 860px) { .stack-grid { grid-template-columns: 1fr 1fr; } }
+
+/* ── Hamburger button (hidden on desktop) ── */
+.hamburger {
+  display: none; flex-direction: column; justify-content: center; align-items: center;
+  gap: 5px; background: none; border: none; cursor: pointer; padding: 6px 4px;
+  flex-shrink: 0;
+}
+.hamburger span {
+  display: block; width: 20px; height: 2px;
+  background: var(--muted); border-radius: 2px;
+  transition: transform 0.2s, opacity 0.15s, background 0.15s;
+}
+.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); background: var(--text); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); background: var(--text); }
+
+/* ── Tablet landscape (≤1024px) ── */
+@media (max-width: 1024px) {
+  nav ul { gap: 14px; }
+  nav ul a { font-size: 0.82rem; }
+}
+
+/* ── Tablet (≤860px) ── */
+@media (max-width: 860px) {
+  .wrap { padding: 0 24px; }
+  .stack-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── Mobile (≤740px) ── */
 @media (max-width: 740px) {
-  .hero { grid-template-columns: 1fr; gap: 36px; padding: 56px 0 44px; }
-  .tiers { grid-template-columns: 1fr 1fr; }
-  .roles { grid-template-columns: 1fr; }
-  .two-col { grid-template-columns: 1fr; gap: 36px; }
-  .hgrid { grid-template-columns: 1fr; }
+  .wrap { padding: 0 18px; }
+  section { padding: 52px 0; }
+  h2 { font-size: 1.45rem; letter-spacing: -0.015em; }
+  p { max-width: none; }
+
+  /* Hero */
+  .hero { grid-template-columns: 1fr; gap: 32px; padding: 48px 0 40px; }
+  .hero-desc { font-size: 0.95rem; max-width: none; }
+
+  /* Nav: hamburger mode */
+  .hamburger { display: flex; }
+  nav { position: relative; }
+  nav .inner { gap: 10px; }
+  nav ul {
+    display: flex; flex-direction: column; gap: 0;
+    position: absolute; top: 100%; left: 0; right: 0;
+    background: rgba(9,21,42,0.98);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.28s ease; z-index: 200;
+  }
+  nav ul.open { max-height: 360px; }
+  nav ul li { border-bottom: 1px solid var(--border); }
+  nav ul a { display: block; padding: 14px 20px; font-size: 0.9rem; color: var(--text); }
+  .btn-nav { font-size: 0.75rem; padding: 7px 13px; }
+
+  /* Stats bar: wrap into 2-column grid */
+  .stats-bar { padding: 12px 0; }
+  .stats-inner { flex-wrap: wrap; justify-content: flex-start; padding: 0 18px; gap: 0; }
+  .stat-sep { display: none; }
+  .stat { font-size: 0.72rem; padding: 4px 14px 4px 0; letter-spacing: 0.01em; width: 50%; }
+
+  /* Pipeline */
   .pipeline { grid-template-columns: 1fr; }
   .pa { display: none; }
+
+  /* Layouts */
+  .two-col { grid-template-columns: 1fr; gap: 28px; }
   .stack-grid { grid-template-columns: 1fr; }
-  .stats-inner { gap: 4px; }
-  .stat-sep { display: none; }
-  .stat { padding: 3px 10px; }
-  nav ul { display: none; }
+  .tiers { grid-template-columns: 1fr 1fr; }
+  .roles { grid-template-columns: 1fr; }
+  .why-row { grid-template-columns: 1fr; }
+  .hgrid { grid-template-columns: 1fr; }
+  .qs-paths { grid-template-columns: 1fr; }
+  .author-inner { grid-template-columns: 1fr; }
+
+  /* Header grid rows */
+  .hrow { flex-wrap: wrap; gap: 4px; }
+  .hn { min-width: auto; font-size: 0.72rem; }
+  .hd { font-size: 0.8rem; }
+
+  /* Quick start */
+  .qs-path { padding: 22px 20px; }
+
+  /* Problem hook */
+  .problem-hook { padding: 20px 22px; }
+  .problem-text { font-size: 0.95rem; }
+  .problem-solution { font-size: 0.9rem; }
+
+  /* Code blocks */
+  .codeblock { font-size: 0.72rem; padding: 14px 16px; }
+  .flow-showcase-body { font-size: 0.72rem; padding: 14px 18px; }
+  .term-body { padding: 14px 16px; min-height: 180px; }
+
+  /* CLI table: horizontal scroll */
+  .clitable-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 4px; }
+  .clitable { font-size: 0.72rem; min-width: 460px; }
+  .clitable th, .clitable td { padding: 8px 10px; }
+
+  /* MIT banner */
+  .mit-banner { font-size: 0.875rem; padding: 16px 18px; }
+
+  /* Footer */
   .footer-inner { flex-direction: column; align-items: flex-start; }
   .footer-links { align-items: flex-start; }
 }
+
+/* ── Small mobile (≤600px) ── */
+@media (max-width: 600px) {
+  .wrap { padding: 0 14px; }
+  section { padding: 44px 0; }
+  h2 { font-size: 1.3rem; }
+  .hero { padding: 40px 0 32px; }
+  .hero h1 { font-size: clamp(1.3rem, 5.5vw, 1.8rem); line-height: 1.2; }
+  .hero-eyebrow { font-size: 0.75rem; }
+  .hero-desc { font-size: 0.9rem; line-height: 1.65; }
+  .stats-inner { display: grid; grid-template-columns: 1fr 1fr; padding: 0 14px; gap: 0; }
+  .stat { width: auto; font-size: 0.69rem; padding: 5px 6px; }
+  .stat::before { width: 5px; height: 5px; }
+  .codeblock { font-size: 0.68rem; padding: 12px 13px; }
+  .flow-showcase-body { font-size: 0.68rem; padding: 12px 14px; }
+  .btn { font-size: 0.8rem; padding: 9px 16px; }
+  .tier { padding: 18px 16px; }
+  .tier-id { font-size: 1.3rem; }
+  .blog-post-link { font-size: 0.8rem; }
+  .platform-row { gap: 6px; }
+  .plat { font-size: 0.65rem; padding: 2px 6px; }
+}
+
+/* ── Extra-small (≤420px) ── */
+@media (max-width: 420px) {
+  .wrap { padding: 0 12px; }
+  section { padding: 36px 0; }
+  .hero h1 { font-size: 1.6rem; }
+  h2 { font-size: 1.15rem; }
+  .tiers { grid-template-columns: 1fr; }
+  .stats-inner { grid-template-columns: 1fr; gap: 0; }
+  .stat { width: 100%; border-bottom: 1px solid rgba(29,48,88,0.4); padding: 7px 0; }
+  .nav-logo { font-size: 1rem; }
+  .btn-nav { font-size: 0.7rem; padding: 6px 10px; }
+  .dl-caret { display: none; }
+  .footer-copy { font-size: 0.72rem; }
+  .author-avatar { width: 54px; height: 54px; font-size: 1.1rem; }
+  .hero { padding: 32px 0 28px; gap: 24px; }
+  .hero-desc { font-size: 0.875rem; }
+  .problem-hook { padding: 16px 16px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cursor { animation: none; opacity: 1; }
   .tier-start { animation: none; }
@@ -550,7 +702,7 @@ footer a:hover { text-decoration: underline; }
 .why-col.before-col .why-list li::before { background: #2D4060; }
 .why-col.after-col  .why-list li::before { background: var(--teal); box-shadow: 0 0 5px rgba(34,184,153,0.5); }
 .why-col.after-col  .why-list li { color: var(--text); }
-@media (max-width: 600px) { .why-row { grid-template-columns: 1fr; } }
+/* .why-row responsive handled in main breakpoint block */
 
 /* ── AUTHOR ── */
 #author { background: var(--surface); }
@@ -590,7 +742,7 @@ footer a:hover { text-decoration: underline; }
   background: rgba(61,142,240,0.6); flex-shrink: 0;
 }
 .blog-post-link:hover { text-decoration: underline; }
-@media (max-width: 600px) { .author-inner { grid-template-columns: 1fr; } }
+/* .author-inner responsive handled in main breakpoint block */
 
 
 /* ── DOWNLOAD DROPDOWN ── */
@@ -639,7 +791,10 @@ footer a:hover { text-decoration: underline; }
 <!-- ── NAVIGATION ── -->
 <nav>
   <div class="inner">
-    <a href="#" class="nav-logo">flow<span>/ ISG</span></a>
+    <a href="#" class="nav-logo">FLOW<span>/ ISG</span></a>
+    <button class="hamburger" id="hamburger" aria-label="Open navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
     <ul>
       <li><a href="#overview">Overview</a></li>
       <li><a href="#stack">Stack</a></li>
@@ -676,19 +831,31 @@ footer a:hover { text-decoration: underline; }
   </div>
 </nav>
 
+<!-- ── DEV STATUS BANNER ── -->
+<div class="dev-banner">
+  <div class="wrap">
+    <span class="dev-banner-icon">🔬</span>
+    <span>FLOW is currently in active development and testing &mdash; expect rough edges.
+    A more stable release is on its way.</span>
+    <a href="../../issues" class="dev-banner-link">Follow progress →</a>
+  </div>
+</div>
+
 <!-- ── HERO ── -->
 <div class="hero-outer">
   <div class="hero-grid"></div>
   <div class="wrap">
     <div class="hero">
       <div>
-        <p class="hero-eyebrow">Stop hand-crafting stimulus sequences.</p>
+        <p class="hero-eyebrow">Stop rebuilding workload generators for every new platform.</p>
         <div class="hero-tag"><span class="js-ver-tag">v0.2.2</span> &nbsp;&middot;&nbsp; ISA-agnostic &nbsp;&middot;&nbsp; MIT SDK</div>
-        <h1>Instruction streams<br>for <em>any</em> CPU.</h1>
+        <h1>Legal instruction streams.<br>Any architecture. <em>Any platform.</em></h1>
         <p class="hero-desc">
-          FLOW generates legal, varied sequences of CPU instructions for
-          <strong>SoC simulation, virtual prototyping,</strong> and performance analysis
-          &mdash; from a small constraint script. Any ISA. Any simulator.
+          FLOW generates varied, constraint-aware instruction sequences for
+          <strong>virtual prototyping, SoC simulation,</strong> and performance analysis.
+          Describe your architecture and address space &mdash; FLOW handles operand
+          legality, constraint enforcement, and reproducibility.
+          Any ISA. Any simulator.
         </p>
         <div class="btn-row">
           <a href="https://github.com/VSPhaneendraPaluri/FLOW-releases" class="btn btn-secondary" target="_blank">GitHub &#x2197;</a>
@@ -729,7 +896,7 @@ footer a:hover { text-decoration: underline; }
     <span class="stat-sep"></span>
     <span class="stat">Linux &amp; Windows</span>
     <span class="stat-sep"></span>
-    <span class="stat">Dynamic plugin loading</span>
+    <span class="stat">Platform-aware workloads</span>
   </div>
 </div>
 
@@ -744,10 +911,10 @@ footer a:hover { text-decoration: underline; }
        and reproducible random draws &mdash; your ISA definition never needs to change.</p>
 
     <div class="problem-hook">
-      <p class="problem-text">Every new ISA starts the same way: a simulation model is ready, but the stimulus
-        isn&rsquo;t. Writing directed sequences by hand is slow, error-prone, and doesn&rsquo;t
-        scale to constrained-random testing. A new SoC variant shouldn&rsquo;t mean weeks of
-        re-authoring test scaffolding.</p>
+      <p class="problem-text">Every new architecture or platform variant starts the same way: the model is
+        ready, but the workload generator isn&rsquo;t. Hand-writing sequences is slow,
+        error-prone, and doesn&rsquo;t scale. A new SoC spin shouldn&rsquo;t mean rebuilding
+        the stimulus from scratch.</p>
       <p class="problem-solution">FLOW ends that cold-start.</p>
     </div>
 
@@ -842,18 +1009,19 @@ footer a:hover { text-decoration: underline; }
            Under an hour to a working Tier&#x2011;A plugin.</p>
       </div>
       <div class="stack-tile sc">
-        <span class="st-label sc">SystemC / TLM2</span>
+        <span class="st-label sc">SystemC / TLM-2</span>
         <h3>VP stimulus generation</h3>
-        <p>The Tier-3 encode hook produces byte streams your TLM2 initiator
-           socket can consume directly &mdash; no assembler, no post-processing.
-           FLOW plugs into your virtual platform&rsquo;s stimulus path.</p>
+        <p>FLOW connects directly to your virtual platform&rsquo;s stimulus path.
+           Encoded byte streams ready for TLM-2 consumption &mdash;
+           no assembler step, no post-processing, no glue code.</p>
       </div>
       <div class="stack-tile sim">
-        <span class="st-label sim">Virtual platforms</span>
-        <h3>Spike &middot; QEMU &middot; gem5</h3>
-        <p>Pipe assembly output through your assembler and feed it to any
-           instruction-set simulator. FLOW is simulator-neutral &mdash; the script
-           layer never sees the target platform.</p>
+        <span class="st-label sim">SoC platforms</span>
+        <h3>Platform workload generation</h3>
+        <p>Describe your platform&rsquo;s address space alongside your ISA &mdash;
+           FLOW generates load and store sequences that stay within valid regions.
+           Realistic traffic for cache, interconnect, and power analysis,
+           not just instruction-fetch patterns.</p>
       </div>
       <div class="stack-tile elf">
         <span class="st-label elf">ELF pipeline</span>
@@ -964,27 +1132,56 @@ footer a:hover { text-decoration: underline; }
         <p>Describe your ISA entirely in <code>instructions.yml</code> and
            <code>registers.yml</code>. No compilation needed.
            Under an hour to running output.</p>
+        <ul class="tier-covers">
+          <li>Full instruction table, register file, instruction tags</li>
+          <li>Constrained-random draws and mix weights</li>
+          <li>Assembly-text output — ready for any ISS with its own assembler</li>
+          <li>Works for most standard RISC-style ISAs with fixed-width formats</li>
+          <hr class="tier-divider">
+          <li class="up">Upgrade to B for split immediates or binary output</li>
+        </ul>
       </div>
       <div class="tier">
         <div class="tier-id tb">B</div>
         <span class="tier-badge bb">minimal C++</span>
-        <h3>YAML + encode</h3>
-        <p>Add <code>encodeInstruction()</code> for split immediates,
-           PC-relative branch targets, or packed encoding fields.</p>
+        <h3>YAML + encoding</h3>
+        <p>Add a small encoding step for split immediates,
+           PC-relative targets, or packed fields.
+           Same YAML base; roughly one C++ source file.</p>
+        <ul class="tier-covers">
+          <li>Everything in A, plus binary byte-stream output</li>
+          <li>Split immediates and PC-relative offset calculation</li>
+          <li>Packed or non-contiguous immediate fields</li>
+          <hr class="tier-divider">
+          <li class="up">Upgrade to C for cross-operand constraints</li>
+        </ul>
       </div>
       <div class="tier">
         <div class="tier-id tc">C</div>
         <span class="tier-badge bc">moderate C++</span>
-        <h3>+ validate</h3>
-        <p>Override <code>validateOperands()</code> for register
-           write-protection, pipeline hazard rules, or pairing constraints.</p>
+        <h3>+ operand rules</h3>
+        <p>Add cross-operand validation for register write-protection,
+           pipeline hazard rules, or instruction pairing constraints.</p>
+        <ul class="tier-covers">
+          <li>Everything in B, plus cross-operand legality checks</li>
+          <li>Register write-protection and hazard exclusions</li>
+          <li>Alignment rules and instruction-pair restrictions</li>
+          <hr class="tier-divider">
+          <li class="up">Upgrade to D for exotic formats or grammar extensions</li>
+        </ul>
       </div>
       <div class="tier">
         <div class="tier-id td2">D</div>
         <span class="tier-badge bd">full C++</span>
-        <h3>IsaDefinition</h3>
-        <p>Subclass <code>IsaDefinition</code> directly for maximum control:
-           exotic encodings, instruction side effects, grammar extensions.</p>
+        <h3>Full C++ plugin</h3>
+        <p>Complete control over every aspect of your ISA &mdash;
+           exotic encodings, instruction side effects,
+           and grammar extensions. For the architectures that need it all.</p>
+        <ul class="tier-covers">
+          <li>Everything in C, plus custom grammar constructs</li>
+          <li>Multi-word encodings and instruction side effects</li>
+          <li>Maximum control — no constraints from YAML schema</li>
+        </ul>
       </div>
     </div>
   </div>
@@ -1132,6 +1329,7 @@ footer a:hover { text-decoration: underline; }
     <p>Both <code>flow</code> and <code>flow_validate</code> are single-binary tools.
        No runtime dependencies beyond the ISA plugin you supply.</p>
 
+    <div class="clitable-wrap">
     <table class="clitable">
       <thead>
         <tr><th>Option</th><th>Description</th></tr>
@@ -1146,6 +1344,7 @@ footer a:hover { text-decoration: underline; }
         <tr><td>--help</td><td>Print usage</td></tr>
       </tbody>
     </table>
+    </div>
     <p style="margin-top:18px">
       <code>--plugin</code> and <code>--isa-dir</code> are mutually exclusive;
       <code>--plugin</code> takes precedence when both are given.
