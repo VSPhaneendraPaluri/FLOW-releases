@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: flow-sdk-playground
+    env: node
+    rootDir: app
+    buildCommand: npm install
+    startCommand: node server.js
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000

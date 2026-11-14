@@ -1,0 +1,16 @@
+{
+  "name": "flow-sdk-playground",
+  "version": "2.0.0",
+  "description": "FLOW SDK Playground — browse, edit and run .flow scripts",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express"  : "^4.18.2",
+    "adm-zip"  : "^0.5.10"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

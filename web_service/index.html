@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FLOW SDK Playground</title>
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg-workbench : #1e1e1e;
+  --bg-sidebar   : #252526;
+  --bg-editor    : #1e1e1e;
+  --bg-titlebar  : #323233;
+  --bg-toolbar   : #2d2d2d;
+  --bg-statusbar : #007acc;
+  --bg-tab       : #2d2d2d;
+  --bg-tab-active: #1e1e1e;
+  --bg-panel     : #1e1e1e;
+  --bg-actbar    : #333333;
+  --bg-hover     : #2a2d2e;
+  --bg-selected  : #094771;
+  --bg-output    : #0e0e0e;
+
+  --fg-primary   : #cccccc;
+  --fg-secondary : #858585;
+  --fg-statusbar : #ffffff;
+  --fg-tab       : #969696;
+  --fg-tab-active: #ffffff;
+  --fg-info      : #9cdcfe;
+  --fg-success   : #4ec9b0;
+  --fg-error     : #f48771;
+  --fg-warn      : #ce9178;
+
+  --border       : #474747;
+  --border-light : #3c3c3c;
+  --accent       : #007acc;
+  --btn-run      : #2d7a2d;
+  --btn-run-h    : #3a9a3a;
+  --btn-validate : #4a4a1e;
+  --btn-validate-h: #6a6a28;
+
+  --actbar-width : 48px;
+  --sidebar-width: 240px;
+  --titlebar-h   : 35px;
+  --toolbar-h    : 36px;
+  --statusbar-h  : 22px;
+  --tab-h        : 35px;
+  --output-h     : 200px;
+  --font-ui  : -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Cascadia Code", "Fira Code", Consolas, monospace;
+}
+html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); color: var(--fg-primary); font-family: var(--font-ui); font-size: 13px; }
+
+/* ── Layout ── */
+#workbench { display: flex; flex-direction: column; height: 100vh; }
+
+#titlebar {
+  height: var(--titlebar-h); background: var(--bg-titlebar);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--fg-primary); flex-shrink: 0;
+  border-bottom: 1px solid #000; user-select: none;
+}
+#titlebar .pill {
+  font-size: 10px; background: #007acc22; color: var(--accent);
+  border: 1px solid #007acc44; border-radius: 10px;
+  padding: 1px 8px; margin-left: 10px;
+}
+
+/* ── Toolbar ── */
+#toolbar {
+  height: var(--toolbar-h); background: var(--bg-toolbar);
+  display: flex; align-items: center; padding: 0 10px; gap: 6px;
+  border-bottom: 1px solid #000; flex-shrink: 0;
+}
+.tb-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 4px; border: none;
+  font-size: 12px; font-family: var(--font-ui); cursor: pointer;
+  color: var(--fg-primary); background: #3a3a3a;
+  transition: background .15s;
+}
+.tb-btn:hover:not(:disabled) { background: #4a4a4a; }
+.tb-btn:disabled { opacity: .4; cursor: not-allowed; }
+#btn-save     { }
+#btn-run      { background: var(--btn-run); }
+#btn-run:hover:not(:disabled) { background: var(--btn-run-h); }
+#btn-validate { background: var(--btn-validate); }
+#btn-validate:hover:not(:disabled) { background: var(--btn-validate-h); }
+#btn-stop     { background: #6e1a1a; display: none; }
+#btn-stop:hover { background: #8e2a2a; }
+
+.tb-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+#plugin-wrap { display: flex; align-items: center; gap: 5px; margin-left: 4px; }
+#plugin-wrap label { font-size: 11px; color: var(--fg-secondary); }
+#plugin-select {
+  background: #3a3a3a; border: 1px solid var(--border); color: var(--fg-primary);
+  font-size: 12px; padding: 3px 6px; border-radius: 3px;
+  font-family: var(--font-mono); max-width: 220px;
+}
+#plugin-select option { background: #252526; }
+
+.tb-status { margin-left: auto; font-size: 11px; color: var(--fg-secondary); }
+#run-indicator { display: none; }
+#run-indicator.visible { display: inline-flex; align-items: center; gap: 5px; }
+.spinner {
+  width: 10px; height: 10px; border: 2px solid var(--fg-secondary);
+  border-top-color: var(--fg-success); border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Main ── */
+#main { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Activity bar ── */
+#actbar {
+  width: var(--actbar-width); background: var(--bg-actbar);
+  display: flex; flex-direction: column; align-items: center;
+  padding-top: 4px; gap: 2px; border-right: 1px solid #000; flex-shrink: 0;
+}
+.act-btn {
+  width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; border-radius: 4px; position: relative;
+  color: var(--fg-secondary); font-size: 20px; border: none; background: transparent;
+  transition: color .15s;
+}
+.act-btn:hover  { color: var(--fg-primary); background: #ffffff0d; }
+.act-btn.active { color: var(--fg-primary); }
+.act-btn.active::before {
+  content: ''; position: absolute; left: 0; top: 10%; height: 80%;
+  width: 2px; background: var(--accent); border-radius: 0 2px 2px 0;
+}
+
+/* ── Sidebar ── */
+#sidebar {
+  width: var(--sidebar-width); background: var(--bg-sidebar);
+  display: flex; flex-direction: column;
+  border-right: 1px solid #000; flex-shrink: 0; overflow: hidden;
+}
+#sidebar-header {
+  padding: 10px 12px 6px; font-size: 11px; font-weight: 700;
+  letter-spacing: .08em; color: var(--fg-secondary); text-transform: uppercase;
+  flex-shrink: 0;
+}
+#file-tree { flex: 1; overflow-y: auto; overflow-x: hidden; padding-bottom: 8px; }
+#file-tree::-webkit-scrollbar { width: 6px; }
+#file-tree::-webkit-scrollbar-thumb { background: #424242; border-radius: 3px; }
+
+.tree-item {
+  display: flex; align-items: center; gap: 5px;
+  padding: 2px 0; cursor: pointer; white-space: nowrap;
+  overflow: hidden; color: var(--fg-primary); font-size: 13px; border-radius: 2px;
+}
+.tree-item:hover { background: var(--bg-hover); }
+.tree-item.selected { background: var(--bg-selected); }
+.tree-item .icon { flex-shrink: 0; font-size: 14px; }
+.tree-item .label { overflow: hidden; text-overflow: ellipsis; }
+.tree-dir > .tree-item { font-weight: 500; }
+
+/* ── Resizer ── */
+#resizer {
+  width: 4px; cursor: col-resize; background: transparent; flex-shrink: 0;
+  transition: background .15s;
+}
+#resizer:hover, #resizer.dragging { background: var(--accent); }
+
+/* ── Editor area ── */
+#editor-area {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--bg-editor); min-width: 0;
+}
+
+/* ── Tab bar ── */
+#tabs {
+  height: var(--tab-h); background: var(--bg-workbench);
+  display: flex; align-items: flex-end;
+  overflow-x: auto; overflow-y: hidden; border-bottom: 1px solid #000;
+  flex-shrink: 0;
+}
+#tabs::-webkit-scrollbar { display: none; }
+.tab {
+  display: flex; align-items: center; gap: 7px;
+  height: 34px; padding: 0 10px 0 14px;
+  background: var(--bg-tab); color: var(--fg-tab);
+  border-right: 1px solid #000; cursor: pointer;
+  white-space: nowrap; flex-shrink: 0;
+  font-size: 13px; min-width: 100px; max-width: 200px;
+}
+.tab.active { background: var(--bg-tab-active); color: var(--fg-tab-active); border-top: 1px solid var(--accent); }
+.tab .tab-dirty { color: #e5c07b; font-size: 10px; }
+.tab .tab-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.tab .tab-close { font-size: 14px; opacity: 0; padding: 0 2px; border-radius: 3px; color: var(--fg-secondary); flex-shrink: 0; }
+.tab:hover .tab-close, .tab.active .tab-close { opacity: 1; }
+.tab .tab-close:hover { background: #ffffff22; color: #fff; }
+#tab-new { display: flex; align-items: center; padding: 0 12px; color: var(--fg-secondary); cursor: pointer; font-size: 18px; flex-shrink: 0; }
+#tab-new:hover { color: var(--fg-primary); }
+
+/* ── Monaco wrapper ── */
+#editor-wrapper { flex: 1; overflow: hidden; position: relative; min-height: 0; }
+#monaco-container { width: 100%; height: 100%; }
+
+/* ── Doc panel ── */
+#doc-panel {
+  position: absolute; inset: 0; overflow-y: auto; padding: 32px 48px;
+  display: none; background: var(--bg-editor); color: var(--fg-primary);
+  font-size: 14px; line-height: 1.65;
+}
+#doc-panel::-webkit-scrollbar { width: 8px; }
+#doc-panel::-webkit-scrollbar-thumb { background: #424242; border-radius: 4px; }
+#doc-panel h1,#doc-panel h2,#doc-panel h3 { color: #e2e8f0; margin: 1.4em 0 .5em; }
+#doc-panel h1 { font-size: 1.6em; border-bottom: 1px solid var(--border); padding-bottom: .4em; }
+#doc-panel p { margin: .6em 0; }
+#doc-panel a { color: #4fc3f7; }
+#doc-panel code { background: #2d2d2d; border: 1px solid var(--border-light); border-radius: 3px; padding: 1px 5px; font-family: var(--font-mono); font-size: .88em; }
+#doc-panel pre { background: #2d2d2d; border: 1px solid var(--border-light); border-radius: 6px; padding: 14px 18px; overflow-x: auto; margin: 1em 0; }
+#doc-panel pre code { background: none; border: none; padding: 0; font-size: .85em; }
+#doc-panel table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+#doc-panel th, #doc-panel td { border: 1px solid var(--border); padding: 6px 12px; }
+#doc-panel th { background: #2d2d2d; }
+#doc-panel ul, #doc-panel ol { padding-left: 1.5em; margin: .5em 0; }
+#doc-panel blockquote { border-left: 3px solid var(--accent); padding-left: 14px; color: var(--fg-secondary); margin: 1em 0; }
+
+/* ── Welcome ── */
+#welcome {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: var(--fg-secondary); gap: 10px;
+}
+#welcome .logo { font-size: 48px; margin-bottom: 10px; }
+#welcome h2 { font-size: 20px; color: var(--fg-primary); font-weight: 400; }
+#welcome p  { font-size: 13px; max-width: 400px; text-align: center; line-height: 1.6; }
+#welcome .hint { margin-top: 20px; background: #2d2d2d; border: 1px solid var(--border); border-radius: 6px; padding: 12px 20px; font-size: 12px; font-family: var(--font-mono); }
+
+/* ── Output panel ── */
+#output-panel {
+  height: var(--output-h); background: var(--bg-output);
+  border-top: 1px solid #000; display: flex; flex-direction: column;
+  flex-shrink: 0;
+}
+#output-header {
+  height: 28px; background: #1a1a1a; display: flex; align-items: center;
+  padding: 0 12px; gap: 12px; flex-shrink: 0; border-bottom: 1px solid #111;
+  cursor: ns-resize; user-select: none;
+}
+#output-header .out-title { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--fg-secondary); text-transform: uppercase; }
+#output-header .out-actions { margin-left: auto; display: flex; gap: 6px; }
+.out-action-btn {
+  background: none; border: none; color: var(--fg-secondary); cursor: pointer; font-size: 13px; padding: 2px 5px; border-radius: 3px;
+}
+.out-action-btn:hover { background: #333; color: var(--fg-primary); }
+#output-toggle { font-size: 11px; }
+#output-body { flex: 1; overflow-y: auto; padding: 8px 14px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; }
+#output-body::-webkit-scrollbar { width: 6px; }
+#output-body::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+.out-line { white-space: pre-wrap; word-break: break-all; }
+.out-stdout { color: #d4d4d4; }
+.out-stderr { color: var(--fg-error); }
+.out-info   { color: var(--fg-info); }
+.out-info.success { color: var(--fg-success); }
+
+/* ── Status bar ── */
+#statusbar {
+  height: var(--statusbar-h); background: var(--bg-statusbar);
+  display: flex; align-items: center; padding: 0 12px; gap: 16px;
+  font-size: 11px; color: var(--fg-statusbar); flex-shrink: 0; user-select: none;
+}
+#statusbar .sep { opacity: .4; }
+#statusbar .sb-right { margin-left: auto; display: flex; gap: 16px; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #424242; border-radius: 4px; }
+
+/* ── Tooltip ── */
+[data-tip] { position: relative; }
+[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
+  background: #252526; color: var(--fg-primary); font-size: 12px;
+  padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border);
+  white-space: nowrap; z-index: 100; pointer-events: none;
+}
+</style>
+</head>
+<body>
+<div id="workbench">
+
+  <!-- Title bar -->
+  <div id="titlebar">
+    <span>FLOW SDK Playground</span>
+    <span class="pill" id="sdk-version-pill">loading...</span>
+  </div>
+
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <button class="tb-btn" id="btn-save" onclick="saveCurrentFile()" title="Save (Ctrl+S)" disabled>💾 Save</button>
+    <div class="tb-sep"></div>
+
+    <div id="plugin-wrap">
+      <label for="plugin-select">Plugin:</label>
+      <select id="plugin-select">
+        <option value="">— none —</option>
+      </select>
+    </div>
+    <div class="tb-sep"></div>
+
+    <button class="tb-btn" id="btn-run"      onclick="runScript()"      disabled>▶ Run</button>
+    <button class="tb-btn" id="btn-validate" onclick="validateScript()" disabled>✓ Validate</button>
+    <button class="tb-btn" id="btn-stop"     onclick="stopExec()">■ Stop</button>
+
+    <div class="tb-status">
+      <span id="run-indicator"><span class="spinner"></span> Running…</span>
+    </div>
+  </div>
+
+  <div id="main">
+    <!-- Activity bar -->
+    <div id="actbar">
+      <button class="act-btn active" id="btn-explorer" data-tip="Explorer"     onclick="switchPanel('explorer')">📁</button>
+      <button class="act-btn"        id="btn-docs"      data-tip="Grammar Ref" onclick="switchPanel('docs')">📖</button>
+      <button class="act-btn"        id="btn-scratch"   data-tip="New Scratchpad (.flow)" onclick="newScratchpad()">✏️</button>
+      <button class="act-btn"        id="btn-about"     data-tip="About FLOW"  onclick="switchPanel('about')">ℹ️</button>
+    </div>
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div id="sidebar-header">Explorer</div>
+      <div id="file-tree"></div>
+    </div>
+    <div id="resizer"></div>
+
+    <!-- Editor area -->
+    <div id="editor-area">
+      <!-- Tabs -->
+      <div id="tabs">
+        <div id="tab-new" onclick="newScratchpad()" title="New .flow scratchpad">＋</div>
+      </div>
+
+      <!-- Editor / doc / welcome -->
+      <div id="editor-wrapper">
+        <div id="monaco-container"></div>
+        <div id="doc-panel"></div>
+        <div id="welcome">
+          <div class="logo">⚡</div>
+          <h2>FLOW SDK Playground</h2>
+          <p>Browse SDK headers, documentation, and examples.<br>
+             Click any file to open and edit it.<br>
+             Use ✏️ to write a new <code>.flow</code> script and run it.</p>
+          <div class="hint">flow --plugin toy.so  my_script.flow</div>
+        </div>
+      </div>
+
+      <!-- Output panel -->
+      <div id="output-panel">
+        <div id="output-header">
+          <span class="out-title">Output</span>
+          <div class="out-actions">
+            <button class="out-action-btn" onclick="clearOutput()" title="Clear">🗑</button>
+            <button class="out-action-btn" id="output-toggle" onclick="toggleOutput()" title="Collapse">▼</button>
+          </div>
+        </div>
+        <div id="output-body">
+          <span class="out-line out-info">Ready. Open a .flow script and press ▶ Run.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div id="statusbar">
+    <div>⚡ FLOW SDK</div>
+    <div class="sep">|</div>
+    <div id="sb-path">No file open</div>
+    <div class="sb-right">
+      <div id="sb-binary">binary: checking…</div>
+      <div class="sep">|</div>
+      <div id="sb-lang">—</div>
+      <div class="sep">|</div>
+      <div id="sb-version">—</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const S = {
+  tabs        : [],
+  activeTabId : null,
+  editor      : null,
+  serverStatus: null,
+  plugins     : [],
+  scratchCount: 0,
+  currentProc : null,   // AbortController for current SSE
+  outputOpen  : true,
+};
+
+// ── Monaco setup ───────────────────────────────────────────────────────────
+require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs' } });
+
+require(['vs/editor/editor.main'], () => {
+  registerFlowLanguage();
+
+  S.editor = monaco.editor.create(document.getElementById('monaco-container'), {
+    theme              : 'vs-dark',
+    language           : 'cpp',
+    value              : '',
+    automaticLayout    : true,
+    minimap            : { enabled: true },
+    fontSize           : 13,
+    fontFamily         : '"Cascadia Code","Fira Code",Consolas,monospace',
+    fontLigatures      : true,
+    scrollBeyondLastLine: false,
+    wordWrap           : 'off',
+    renderLineHighlight: 'line',
+    smoothScrolling    : true,
+    cursorSmoothCaretAnimation: 'on',
+    tabSize            : 4,
+  });
+
+  // Track edits → dirty flag
+  S.editor.onDidChangeModelContent(() => {
+    const tab = activeTab();
+    if (!tab) return;
+    const newVal = S.editor.getValue();
+    if (newVal !== tab.savedContent) {
+      tab.dirty = true;
+    } else {
+      tab.dirty = false;
+    }
+    tab.content = newVal;
+    updateTabDirty(tab.id);
+    updateSaveBtn();
+  });
+
+  // Ctrl+S
+  S.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, saveCurrentFile);
+
+  loadStatus();
+  loadTree();
+  loadPlugins();
+});
+
+// ── FLOW language ──────────────────────────────────────────────────────────
+function registerFlowLanguage() {
+  monaco.languages.register({ id: 'flow' });
+  const flowTokens = {
+    keywords: [
+      'isa','seed','strict','use','pool','bind','init','intro','outro',
+      'seq','scene','test','spray','run','play','weave','atomic','loop',
+      'fork','label','goto','with','and','when','of','until','using',
+      'taken','fall','expect','report','atleast','atmost','never','always',
+      'class','property','on','within','repeat','any','zero','random',
+      'undef','fill','pattern','load','times','mix','rules','crand',
+      'defaults','after','each','before',
+    ],
+    types: ['reg','addr','imm','instr','mem','int'],
+    tokenizer: {
+      root: [
+        [/#[^\n]*/,                       'comment'],
+        [/"[^"\n]*"/,                     'string'],
+        [/0x[0-9A-Fa-f_]+/,              'number.hex'],
+        [/0b[01_]+/,                      'number.binary'],
+        [/[0-9]+(\.[0-9]+)?%/,           'number'],
+        [/[0-9]+(\.[0-9]+)?/,            'number'],
+        [/\.\./,                          'operator'],
+        [/[{}()[\]]/,                     'delimiter'],
+        [/[-+*/<>=!?,;:@]/,              'operator'],
+        [/[A-Za-z_][A-Za-z0-9_]*/, { cases: { '@keywords':'keyword', '@types':'type', '@default':'identifier' } }],
+      ]
+    }
+  };
+  monaco.languages.setMonarchTokensProvider('flow', flowTokens);
+  monaco.languages.setLanguageConfiguration('flow', {
+    comments: { lineComment: '#' },
+    brackets: [['{','}'],['(',')'],['[',']']],
+    autoClosingPairs: [{open:'{',close:'}'},{open:'(',close:')'},{open:'[',close:']'},{open:'"',close:'"'}],
+  });
+  monaco.languages.register({ id: 'flowrules' });
+  monaco.languages.setMonarchTokensProvider('flowrules', flowTokens);
+  monaco.languages.setLanguageConfiguration('flowrules', flowTokens.brackets ? undefined : undefined);
+}
+
+// ── Status / server info ───────────────────────────────────────────────────
+async function loadStatus() {
+  try {
+    const res  = await fetch('/api/status');
+    const data = await res.json();
+    S.serverStatus = data;
+
+    document.getElementById('sdk-version-pill').textContent = `SDK ${data.sdkVersion}`;
+    document.getElementById('sb-version').textContent = `FLOW ${data.sdkVersion}`;
+
+    const binTxt = data.canRun
+      ? `${data.flowBin}`
+      : 'binary: not found';
+    document.getElementById('sb-binary').textContent = binTxt;
+
+    // Enable/disable buttons
+    const hasFlow = data.canRun || data.canValidate;
+    document.getElementById('btn-run').disabled      = !data.canRun;
+    document.getElementById('btn-validate').disabled = !data.canRun && !data.canValidate;
+
+    if (!hasFlow) {
+      appendOutput('info', 'No FLOW binary found in this release. Run/Validate unavailable.\n');
+    }
+  } catch (e) {
+    console.warn('Status fetch failed', e);
+  }
+}
+
+// ── File tree ──────────────────────────────────────────────────────────────
+async function loadTree() {
+  try {
+    const res  = await fetch('/api/tree');
+    const data = await res.json();
+    renderTree(data.tree, document.getElementById('file-tree'), 0);
+  } catch (e) {
+    document.getElementById('file-tree').textContent = 'Failed to load.';
+  }
+}
+
+const EXT_ICONS = { hpp:'🔷',h:'🔷',cpp:'🔶',c:'🔶',md:'📄',flow:'⚡',rules:'📋',yml:'🗂',yaml:'🗂',cmake:'⚙️',bat:'⚙️',sh:'⚙️',txt:'📝',so:'🔌',dll:'🔌',exe:'▶' };
+const DIR_ICONS = { isa:'📦',docs:'📚',examples:'🧪',templates:'🗒️',toy:'🧸',data:'📊',bin:'📦',plugins:'🔌' };
+
+function fileIcon(n) { return EXT_ICONS[n.split('.').pop().toLowerCase()] || '📄'; }
+function dirIcon(n)  { return DIR_ICONS[n] || '📁'; }
+
+function renderTree(nodes, container, depth) {
+  container.innerHTML = '';
+  for (const node of nodes) {
+    if (node.type === 'dir') {
+      const wrap = document.createElement('div');
+      wrap.className = 'tree-dir';
+      const row = document.createElement('div');
+      row.className = 'tree-item';
+      row.style.paddingLeft = `${10 + depth * 14}px`;
+      row.innerHTML = `<span class="icon" id="arr-${CSS.escape(node.path)}">▶</span><span class="icon">${dirIcon(node.name)}</span><span class="label">${node.name}</span>`;
+      row.onclick = e => { e.stopPropagation(); toggleDir(node, wrap, depth); };
+      wrap.appendChild(row);
+      container.appendChild(wrap);
+    } else {
+      const row = document.createElement('div');
+      row.className = 'tree-item';
+      row.dataset.path = node.path;
+      row.style.paddingLeft = `${10 + depth * 14 + 14}px`;
+      row.innerHTML = `<span class="icon">${fileIcon(node.name)}</span><span class="label">${node.name}</span>`;
+      row.onclick = () => openFile(node.path, node.name);
+      container.appendChild(row);
+    }
+  }
+}
+
+function toggleDir(node, wrap, depth) {
+  const existing = wrap.querySelector('.tree-dir-children');
+  const arr = document.getElementById('arr-' + CSS.escape(node.path));
+  if (existing) { existing.remove(); if (arr) arr.textContent = '▶'; return; }
+  if (arr) arr.textContent = '▼';
+  const ch = document.createElement('div');
+  ch.className = 'tree-dir-children';
+  renderTree(node.children, ch, depth + 1);
+  wrap.appendChild(ch);
+}
+
+// ── Plugins ────────────────────────────────────────────────────────────────
+async function loadPlugins() {
+  try {
+    const res  = await fetch('/api/plugins');
+    const data = await res.json();
+    S.plugins  = data.plugins || [];
+    const sel  = document.getElementById('plugin-select');
+    sel.innerHTML = '<option value="">— none —</option>';
+    for (const p of S.plugins) {
+      const opt = document.createElement('option');
+      opt.value = p.rel;
+      opt.textContent = p.name;
+      sel.appendChild(opt);
+    }
+  } catch (e) { console.warn('Plugin fetch failed', e); }
+}
+
+// ── Open file ──────────────────────────────────────────────────────────────
+async function openFile(filePath, name) {
+  document.querySelectorAll('.tree-item.selected').forEach(el => el.classList.remove('selected'));
+  const row = document.querySelector(`.tree-item[data-path="${filePath}"]`);
+  if (row) row.classList.add('selected');
+
+  const existing = S.tabs.find(t => t.path === filePath);
+  if (existing) { activateTab(existing.id); return; }
+
+  try {
+    const res  = await fetch(`/api/file?path=${encodeURIComponent(filePath)}`);
+    const data = await res.json();
+    if (!res.ok) { alert(data.error); return; }
+    const tab = { id: genId(), label: name, path: filePath,
+                  lang: detectLang(name), content: data.content,
+                  savedContent: data.content, dirty: false };
+    S.tabs.push(tab);
+    renderTabs(); activateTab(tab.id);
+  } catch (e) { alert('Could not load: ' + e.message); }
+}
+
+function detectLang(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  return { hpp:'cpp',h:'cpp',cpp:'cpp',c:'c',md:'markdown',flow:'flow',
+           rules:'flowrules',yml:'yaml',yaml:'yaml',cmake:'plaintext',
+           txt:'plaintext',bat:'bat',sh:'shell' }[ext] || 'plaintext';
+}
+
+// ── Tabs ───────────────────────────────────────────────────────────────────
+function genId() { return 't_' + Math.random().toString(36).slice(2); }
+function activeTab() { return S.tabs.find(t => t.id === S.activeTabId); }
+
+function renderTabs() {
+  const bar = document.getElementById('tabs');
+  bar.querySelectorAll('.tab').forEach(el => el.remove());
+  for (const tab of S.tabs) {
+    const el = document.createElement('div');
+    el.className = 'tab' + (tab.id === S.activeTabId ? ' active' : '');
+    el.dataset.id = tab.id;
+    el.innerHTML = `<span class="icon">${fileIcon(tab.label)}</span>
+                    ${tab.dirty ? '<span class="tab-dirty">●</span>' : ''}
+                    <span class="tab-label">${tab.label}</span>
+                    <span class="tab-close" onclick="closeTab(event,'${tab.id}')">✕</span>`;
+    el.onclick = () => activateTab(tab.id);
+    bar.insertBefore(el, document.getElementById('tab-new'));
+  }
+}
+
+function updateTabDirty(id) {
+  const el  = document.querySelector(`.tab[data-id="${id}"]`);
+  const tab = S.tabs.find(t => t.id === id);
+  if (!el || !tab) return;
+  const existing = el.querySelector('.tab-dirty');
+  if (tab.dirty && !existing) {
+    const span = document.createElement('span');
+    span.className = 'tab-dirty'; span.textContent = '●';
+    el.insertBefore(span, el.querySelector('.tab-label'));
+  } else if (!tab.dirty && existing) {
+    existing.remove();
+  }
+}
+
+function activateTab(id) {
+  S.activeTabId = id;
+  renderTabs();
+  const tab = S.tabs.find(t => t.id === id);
+  if (!tab) return;
+
+  const isMd = tab.lang === 'markdown';
+  const monacoEl = document.getElementById('monaco-container');
+  const docEl    = document.getElementById('doc-panel');
+  const welcomeEl = document.getElementById('welcome');
+
+  welcomeEl.style.display = 'none';
+  monacoEl.style.display  = isMd ? 'none' : 'block';
+  docEl.style.display     = isMd ? 'block' : 'none';
+
+  if (isMd) {
+    docEl.innerHTML = marked.parse(tab.content);
+  } else if (S.editor) {
+    const model = monaco.editor.createModel(tab.content, tab.lang);
+    S.editor.setModel(model);
+    S.editor.layout();
+  }
+
+  document.getElementById('sb-path').textContent = tab.path || tab.label;
+  document.getElementById('sb-lang').textContent  = tab.lang;
+  updateSaveBtn();
+  updateRunBtns();
+}
+
+function closeTab(e, id) {
+  e.stopPropagation();
+  const tab = S.tabs.find(t => t.id === id);
+  if (tab && tab.dirty && !confirm(`${tab.label} has unsaved changes. Close anyway?`)) return;
+  S.tabs = S.tabs.filter(t => t.id !== id);
+  if (S.activeTabId === id)
+    S.activeTabId = S.tabs.length ? S.tabs[S.tabs.length - 1].id : null;
+  renderTabs();
+  S.activeTabId ? activateTab(S.activeTabId) : showWelcome();
+}
+
+function showWelcome() {
+  document.getElementById('welcome').style.display = 'flex';
+  document.getElementById('monaco-container').style.display = 'none';
+  document.getElementById('doc-panel').style.display = 'none';
+  document.getElementById('sb-path').textContent = 'No file open';
+  document.getElementById('sb-lang').textContent = '—';
+  document.getElementById('btn-save').disabled = true;
+}
+
+// ── Save ───────────────────────────────────────────────────────────────────
+function updateSaveBtn() {
+  const tab = activeTab();
+  document.getElementById('btn-save').disabled = !(tab && tab.dirty);
+}
+
+async function saveCurrentFile() {
+  const tab = activeTab();
+  if (!tab || !tab.dirty) return;
+
+  // Sync content from editor first
+  if (S.editor && tab.lang !== 'markdown') {
+    tab.content = S.editor.getValue();
+  }
+
+  if (!tab.path) {
+    // scratchpad — just mark as saved in memory
+    tab.savedContent = tab.content;
+    tab.dirty = false;
+    updateTabDirty(tab.id); updateSaveBtn(); return;
+  }
+
+  try {
+    const res = await fetch('/api/save', {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({ path: tab.path, content: tab.content }),
+    });
+    if (res.ok) {
+      tab.savedContent = tab.content;
+      tab.dirty = false;
+      updateTabDirty(tab.id); updateSaveBtn();
+      appendOutput('info', `Saved: ${tab.path}\n`);
+    } else {
+      const d = await res.json();
+      appendOutput('stderr', `Save failed: ${d.error}\n`);
+    }
+  } catch (e) {
+    appendOutput('stderr', `Save error: ${e.message}\n`);
+  }
+}
+
+// ── Run / Validate ─────────────────────────────────────────────────────────
+function updateRunBtns() {
+  const tab     = activeTab();
+  const isFlow  = tab && (tab.lang === 'flow' || tab.label.endsWith('.flow'));
+  const canRun  = S.serverStatus?.canRun;
+  const canVal  = S.serverStatus?.canRun || S.serverStatus?.canValidate;
+  document.getElementById('btn-run').disabled      = !(isFlow && canRun);
+  document.getElementById('btn-validate').disabled = !(isFlow && canVal);
+}
+
+function getScriptContent() {
+  const tab = activeTab();
+  if (!tab) return null;
+  return S.editor && tab.lang !== 'markdown' ? S.editor.getValue() : tab.content;
+}
+
+function setRunning(flag) {
+  const ind = document.getElementById('run-indicator');
+  const stopBtn = document.getElementById('btn-stop');
+  ind.className = flag ? 'visible' : '';
+  stopBtn.style.display = flag ? 'inline-flex' : 'none';
+  document.getElementById('btn-run').disabled      = flag || !S.serverStatus?.canRun;
+  document.getElementById('btn-validate').disabled = flag;
+}
+
+async function streamExec(endpoint, body) {
+  clearOutput();
+  setRunning(true);
+  const ctrl = new AbortController();
+  S.currentProc = ctrl;
+
+  try {
+    const res = await fetch(endpoint, {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify(body),
+      signal : ctrl.signal,
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (const part of parts) {
+        if (!part.startsWith('data: ')) continue;
+        try {
+          const msg = JSON.parse(part.slice(6));
+          if (msg.type === 'exit') {
+            appendOutput('info', '', msg.code === 0);  // empty line acts as spacing
+          } else {
+            appendOutput(msg.type, msg.text || '');
+          }
+        } catch {}
+      }
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError')
+      appendOutput('stderr', `\nConnection error: ${e.message}\n`);
+  } finally {
+    setRunning(false);
+    S.currentProc = null;
+    updateRunBtns();
+  }
+}
+
+function runScript() {
+  const content = getScriptContent();
+  if (!content) return;
+  const pluginPath = document.getElementById('plugin-select').value;
+  streamExec('/api/run', { script: content, pluginPath });
+}
+
+function validateScript() {
+  const content = getScriptContent();
+  if (!content) return;
+  streamExec('/api/validate', { script: content });
+}
+
+function stopExec() {
+  if (S.currentProc) { S.currentProc.abort(); S.currentProc = null; }
+  appendOutput('info', '\n[Stopped by user]\n');
+  setRunning(false);
+}
+
+// ── Output panel ───────────────────────────────────────────────────────────
+function appendOutput(type, text, isSuccess = false) {
+  const body = document.getElementById('output-body');
+  if (!text) return;
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (i === lines.length - 1 && lines[i] === '') continue;
+    const span = document.createElement('span');
+    span.className = `out-line out-${type}${isSuccess ? ' success' : ''}`;
+    span.textContent = lines[i] + '\n';
+    body.appendChild(span);
+  }
+  body.scrollTop = body.scrollHeight;
+}
+
+function clearOutput() {
+  document.getElementById('output-body').innerHTML = '';
+}
+
+function toggleOutput() {
+  const panel  = document.getElementById('output-panel');
+  const btn    = document.getElementById('output-toggle');
+  const body   = document.getElementById('output-body');
+  S.outputOpen = !S.outputOpen;
+  body.style.display  = S.outputOpen ? '' : 'none';
+  panel.style.height  = S.outputOpen ? 'var(--output-h)' : '28px';
+  btn.textContent     = S.outputOpen ? '▼' : '▲';
+}
+
+// ── Scratchpad ─────────────────────────────────────────────────────────────
+const SCRATCH = `# FLOW scratchpad
+isa toy
+use "toy.rules"
+seed 0xDEADBEEF
+
+test my_test {
+    crand 4 alu_rr
+}
+`;
+
+function newScratchpad() {
+  S.scratchCount++;
+  const label = `scratch_${S.scratchCount}.flow`;
+  const tab = { id: genId(), label, path: null, lang: 'flow',
+                content: SCRATCH, savedContent: SCRATCH, dirty: false };
+  S.tabs.push(tab); renderTabs(); activateTab(tab.id);
+  setTimeout(() => S.editor?.focus(), 100);
+}
+
+// ── Panel switching ────────────────────────────────────────────────────────
+const ABOUT_MD = `# About FLOW SDK Playground
+**FLOW** — CPU ISA-agnostic constrained-random instruction stream generator.
+
+| Role | Artifact | Writes |
+|------|----------|--------|
+| ISA plugin author | \`my_isa.so\` | C++ subclass of \`IISAPlugin\` |
+| Test architect | \`<name>.rules\` | Legality envelope |
+| Test script writer | \`<name>.flow\` | Directed / random sequences |
+
+## Running
+\`\`\`bash
+flow --plugin toy.so  my_script.flow
+flow_validate         my_script.flow
+\`\`\`
+*Built by Phaneendra Paluri — virtual prototyping engineer.*
+`;
+let grammarMd = null;
+
+function switchPanel(panel) {
+  ['explorer','docs','about'].forEach(p => {
+    document.getElementById('btn-' + p)?.classList.toggle('active', p === panel);
+  });
+  document.getElementById('sidebar-header').textContent =
+    { explorer: 'Explorer', docs: 'Grammar Reference', about: 'About' }[panel] || panel;
+  document.getElementById('file-tree').style.display = panel === 'explorer' ? '' : 'none';
+
+  if (panel === 'docs') loadGrammarRef();
+  if (panel === 'about') showStaticDoc(ABOUT_MD, 'About FLOW');
+}
+
+async function loadGrammarRef() {
+  if (grammarMd) { showStaticDoc(grammarMd, 'Grammar Reference'); return; }
+  try {
+    const res = await fetch('/api/file?path=docs/grammar_v2.md');
+    if (res.ok) { const d = await res.json(); grammarMd = d.content; showStaticDoc(grammarMd, 'Grammar Reference'); }
+    else showStaticDoc('> Grammar reference not found.', 'Grammar Reference');
+  } catch { showStaticDoc('> Could not load grammar reference.', 'Grammar Reference'); }
+}
+
+function showStaticDoc(md, title) {
+  document.getElementById('welcome').style.display   = 'none';
+  document.getElementById('monaco-container').style.display = 'none';
+  document.getElementById('doc-panel').style.display = 'block';
+  document.getElementById('doc-panel').innerHTML     = marked.parse(md);
+  document.getElementById('sb-path').textContent = title;
+  document.getElementById('sb-lang').textContent = 'markdown';
+}
+
+// ── Sidebar resizer ────────────────────────────────────────────────────────
+(function () {
+  const resizer = document.getElementById('resizer');
+  const sidebar = document.getElementById('sidebar');
+  let dragging = false, startX = 0, startW = 0;
+  resizer.addEventListener('mousedown', e => {
+    dragging = true; startX = e.clientX; startW = sidebar.offsetWidth;
+    resizer.classList.add('dragging'); document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none';
+  });
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    sidebar.style.width = Math.max(140, Math.min(500, startW + e.clientX - startX)) + 'px';
+  });
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return; dragging = false;
+    resizer.classList.remove('dragging'); document.body.style.cursor = ''; document.body.style.userSelect = '';
+  });
+})();
+</script>
+</body>
+</html>
