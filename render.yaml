@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: flow-sdk-playground
+    runtime: node
+    rootDir: web_service
+    buildCommand: npm install
+    startCommand: node server.js
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: GITHUB_OWNER
+        value: Phaneendra-Paluri
+      - key: GITHUB_REPO
+        value: FLOW-releases
+      - key: GITHUB_TOKEN
+        sync: false   # set manually in Render dashboard (optional — avoids rate limits)
