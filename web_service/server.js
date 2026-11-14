@@ -384,7 +384,9 @@ function writeTempScript(content, scriptPath, prefix) {
             return tmp;
         }
     }
-    return path.join(__dirname, `${prefix}_${Date.now()}.flow`);
+    const tmp = path.join(os.tmpdir(), `${prefix}_${Date.now()}.flow`);
+    fs.writeFileSync(tmp, content, 'utf8');
+    return tmp;
 }
 
 // ── API: run ───────────────────────────────────────────────────────────────
