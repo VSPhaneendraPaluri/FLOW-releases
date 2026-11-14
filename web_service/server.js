@@ -115,6 +115,10 @@ function download(url, token, redirects = 0) {
 function loadFromPath(zipPath) {
     console.log(`[sdk] Loading from path: ${zipPath}`);
     extractZipBuffer(fs.readFileSync(zipPath));
+    if (SDK_VERSION === 'unknown') {
+        const m = path.basename(zipPath).match(/flow-sdk-(\d+\.\d+\.\d+)/i);
+        if (m) SDK_VERSION = m[1];
+    }
     console.log(`[sdk] Loaded. version=${SDK_VERSION}`);
 }
 
@@ -169,6 +173,10 @@ async function loadFromGitHub() {
     console.log(`[sdk] Downloading asset: ${asset.name} (${(asset.size / 1e6).toFixed(1)} MB)`);
     const buf = await download(asset.browser_download_url, TOKEN);
     extractZipBuffer(buf);
+    if (SDK_VERSION === 'unknown') {
+        const m = asset.name.match(/flow-sdk-(\d+\.\d+\.\d+)/i);
+        if (m) SDK_VERSION = m[1];
+    }
     console.log(`[sdk] Ready. version=${SDK_VERSION}`);
 }
 
