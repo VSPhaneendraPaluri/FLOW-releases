@@ -384,7 +384,7 @@ function writeTempScript(content, scriptPath, prefix) {
             return tmp;
         }
     }
-    return path.join(os.tmpdir(), `${prefix}_${Date.now()}.flow`);
+    return path.join(__dirname, `${prefix}_${Date.now()}.flow`);
 }
 
 // ── API: run ───────────────────────────────────────────────────────────────
@@ -405,7 +405,7 @@ app.post('/api/run', (req, res) => {
         args.push('--plugin', path.isAbsolute(pluginPath)
             ? pluginPath : path.join(SDK_ROOT, pluginPath));
     }
-    args.push(path.basename(tmp));
+    args.push(tmp);
 
     sseMsg(res, 'info',
         `$ ${path.basename(FLOW_BIN)} ${args.map(a => path.basename(a)).join(' ')}\n`);
@@ -433,7 +433,7 @@ app.post('/api/validate', (req, res) => {
     const cwd = path.dirname(tmp);
 
     const bin  = VALID_BIN || FLOW_BIN;
-    const args = VALID_BIN ? [path.basename(tmp)] : ['--validate', path.basename(tmp)];
+    const args = VALID_BIN ? [tmp] : ['--validate', tmp];
     sseMsg(res, 'info',
         `$ ${path.basename(bin)} ${args.map(a => path.basename(a)).join(' ')}\n`);
 
