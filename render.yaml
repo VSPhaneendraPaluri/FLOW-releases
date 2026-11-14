@@ -12,7 +12,7 @@ services:
       - key: PORT
         value: 3000
       - key: GITHUB_OWNER
-        value: Phaneendra-Paluri
+        value: VSPhaneendraPaluri
       - key: GITHUB_REPO
         value: FLOW-releases
       - key: GITHUB_TOKEN
