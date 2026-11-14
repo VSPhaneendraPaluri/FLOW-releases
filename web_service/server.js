@@ -132,8 +132,9 @@ async function loadFromGitHub() {
                 hostname: 'api.github.com',
                 path    : apiPath,
                 headers : {
-                    'User-Agent': 'flow-sdk-playground/1.0',
-                    'Accept'    : 'application/vnd.github+json',
+                    'User-Agent'          : 'flow-sdk-playground/1.0',
+                    'Accept'              : 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2022-11-28',
                 },
                 timeout: 15_000,
             };
@@ -151,7 +152,10 @@ async function loadFromGitHub() {
 
     console.log(`[sdk] Fetching latest release from GitHub: ${OWNER}/${REPO}`);
     const { status, body } = await apiGet(`/repos/${OWNER}/${REPO}/releases/latest`);
-    if (status !== 200) throw new Error(`GitHub API returned ${status}`);
+    if (status !== 200) {
+        console.error(`[sdk] GitHub API ${status}:`, body.toString().slice(0, 200));
+        throw new Error(`GitHub API returned ${status}`);
+    }
 
     const release = JSON.parse(body.toString());
     const assets  = release.assets || [];
