@@ -375,7 +375,22 @@ const sseDone = (res, code) => {
 // ── Temp file helper ──────────────────────────────────────────────────────
 // Write the temp script adjacent to the original file when possible,
 // so relative `use "foo.rules"` paths resolve correctly.
+
+function findFileInSdk(dir, name) {
+    try {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                const found = findFileInSdk(full, name);
+                if (found) return found;
+            } else if (entry.name === name) return full;
+        }
+    } catch {}
+    return null;
+}
+
 function writeTempScript(content, scriptPath, prefix) {
+    // 1. Prefer adjacent to the original SDK file (scriptPath provided by client)
     if (scriptPath && SDK_ROOT) {
         const dir = path.join(SDK_ROOT, path.dirname(scriptPath));
         if (fs.existsSync(dir)) {
@@ -384,6 +399,20 @@ function writeTempScript(content, scriptPath, prefix) {
             return tmp;
         }
     }
+    // 2. Script uses a relative rules file — find it in the SDK and write next to it
+    if (SDK_ROOT) {
+        const m = content.match(/use\s+"([^"]+\.rules)"/);
+        if (m) {
+            const rulesName = path.basename(m[1]);
+            const found = findFileInSdk(SDK_ROOT, rulesName);
+            if (found) {
+                const tmp = path.join(path.dirname(found), `${prefix}_${Date.now()}.flow`);
+                fs.writeFileSync(tmp, content, 'utf8');
+                return tmp;
+            }
+        }
+    }
+    // 3. Fallback: /tmp (absolute path passed to binary)
     const tmp = path.join(os.tmpdir(), `${prefix}_${Date.now()}.flow`);
     fs.writeFileSync(tmp, content, 'utf8');
     return tmp;
