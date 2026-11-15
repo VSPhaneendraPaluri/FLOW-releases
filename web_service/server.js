@@ -444,12 +444,28 @@ function resolveSafe(rel) {
     return abs;
 }
 
+// Assets bundled with the web_service for local/fallback use
+const ASSETS_DIR = path.join(__dirname, 'assets');
+
 app.get('/api/file', (req, res) => {
-    const abs = resolveSafe(req.query.path);
+    const rel = req.query.path;
+    let abs = resolveSafe(rel);
+
+    // If the SDK-rooted path doesn't exist, fall back to bundled assets/
+    if ((!abs || !fs.existsSync(abs) || fs.statSync(abs).isDirectory()) && rel) {
+        const assetAbs = path.resolve(ASSETS_DIR, rel);
+        // Safety: must still be under assets dir
+        if (assetAbs.startsWith(ASSETS_DIR + path.sep) || assetAbs === ASSETS_DIR) {
+            if (fs.existsSync(assetAbs) && !fs.statSync(assetAbs).isDirectory()) {
+                abs = assetAbs;
+            }
+        }
+    }
+
     if (!abs) return res.status(403).json({ error: 'Forbidden' });
     if (!fs.existsSync(abs) || fs.statSync(abs).isDirectory())
         return res.status(404).json({ error: 'Not found' });
-    try { res.json({ path: req.query.path, content: fs.readFileSync(abs, 'utf8') }); }
+    try { res.json({ path: rel, content: fs.readFileSync(abs, 'utf8') }); }
     catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -612,6 +628,14 @@ app.post('/api/validate', (req, res) => {
 });
 
 // ── Static ─────────────────────────────────────────────────────────────────
+// Expose marked.min.js — prefer node_modules (after npm install), fall back
+// to the vendored copy in assets/vendor/ for local dev without npm install.
+app.use('/vendor/marked.min.js', (_req, res) => {
+    const fromNpm    = path.join(__dirname, 'node_modules', 'marked', 'marked.min.js');
+    const fromAssets = path.join(__dirname, 'assets', 'vendor', 'marked.min.js');
+    const target = fs.existsSync(fromNpm) ? fromNpm : fromAssets;
+    res.sendFile(target);
+});
 app.use(express.static(__dirname));
 app.get('*', (_req, res) =>
     res.sendFile(path.join(__dirname, 'index.html')));

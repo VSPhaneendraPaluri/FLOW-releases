@@ -4,8 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FLOW SDK Playground</title>
+<!-- marked must load BEFORE Monaco's AMD loader: Monaco's loader.js defines a
+     global `define` with `define.amd` set, and marked's UMD wrapper checks
+     for AMD first — if it sees one, it registers as an anonymous AMD module
+     instead of setting `window.marked`, and nothing ever requires it back. -->
+<script src="/vendor/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -66,6 +70,39 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
   font-size: 10px; background: #007acc22; color: var(--accent);
   border: 1px solid #007acc44; border-radius: 10px;
   padding: 1px 8px; margin-left: 10px;
+}
+
+/* ── Update banner ── */
+#update-banner {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 14px;
+  background: #3a2f00;
+  border-bottom: 1px solid #6a5500;
+  font-size: 12px;
+  color: #f0c060;
+  flex-shrink: 0;
+}
+#update-banner.visible { display: flex; }
+#update-banner .upd-msg { flex: 1; }
+#update-banner .upd-msg strong { color: #ffd060; }
+#btn-reload-sdk {
+  padding: 3px 10px; border-radius: 4px; border: 1px solid #6a5500;
+  background: #4a3b00; color: #ffd060; cursor: pointer; font-size: 12px;
+  font-family: var(--font-ui); transition: background .15s;
+}
+#btn-reload-sdk:hover { background: #5e4b00; }
+#btn-dismiss-banner {
+  background: none; border: none; color: #906030; cursor: pointer;
+  font-size: 16px; line-height: 1; padding: 0 2px;
+}
+#btn-dismiss-banner:hover { color: #f0c060; }
+#banner-spinner { display: none; }
+#banner-spinner.visible {
+  display: inline-block; width: 10px; height: 10px;
+  border: 2px solid #906030; border-top-color: #ffd060;
+  border-radius: 50%; animation: spin .6s linear infinite;
 }
 
 /* ── Toolbar ── */
@@ -148,6 +185,77 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
 #file-tree { flex: 1; overflow-y: auto; overflow-x: hidden; padding-bottom: 8px; }
 #file-tree::-webkit-scrollbar { width: 6px; }
 #file-tree::-webkit-scrollbar-thumb { background: #424242; border-radius: 3px; }
+
+/* ── Grammar TOC (shown when docs panel is active) ── */
+#grammar-toc {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+#grammar-toc.visible { display: flex; }
+
+#toc-search-wrap {
+  padding: 6px 10px 4px;
+  flex-shrink: 0;
+}
+#toc-search {
+  width: 100%;
+  background: #3a3a3a;
+  border: 1px solid var(--border);
+  color: var(--fg-primary);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-family: var(--font-ui);
+  outline: none;
+}
+#toc-search:focus { border-color: var(--accent); }
+#toc-search::placeholder { color: var(--fg-secondary); }
+
+#toc-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 8px;
+}
+#toc-list::-webkit-scrollbar { width: 6px; }
+#toc-list::-webkit-scrollbar-thumb { background: #424242; border-radius: 3px; }
+
+.dict-cat { padding: 8px 10px 3px; font-size: 10px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--fg-secondary); }
+.dict-entry { display: flex; flex-direction: column; padding: 4px 10px 4px 14px;
+  cursor: pointer; border-radius: 2px; gap: 1px; }
+.dict-entry:hover { background: var(--bg-hover); }
+.dict-entry.active { background: var(--bg-selected); }
+.dict-entry.dict-hidden { display: none; }
+.dict-kw { font-family: var(--font-mono); font-size: 12px; color: #9cdcfe;
+  font-weight: 600; line-height: 1.3; }
+.dict-desc { font-size: 11px; color: var(--fg-secondary); line-height: 1.3;
+  white-space: normal; }
+/* legacy — kept so old references don't break */
+.toc-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  cursor: pointer;
+  color: var(--fg-primary);
+  font-size: 12px;
+  border-radius: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+.toc-item:hover { background: var(--bg-hover); color: #fff; }
+.toc-item.active { background: var(--bg-selected); color: #fff; }
+.toc-item.h1 { font-weight: 700; font-size: 11px; color: var(--fg-secondary); text-transform: uppercase; letter-spacing: .06em; cursor: default; padding-top: 8px; }
+.toc-item.h1:hover { background: none; color: var(--fg-secondary); }
+.toc-item.h2 { padding-left: 12px; font-weight: 600; }
+.toc-item.h3 { padding-left: 22px; font-size: 11.5px; color: var(--fg-secondary); }
+.toc-item.h3:hover { color: var(--fg-primary); }
+.toc-item.toc-hidden { display: none; }
 
 .tree-item {
   display: flex; align-items: center; gap: 5px;
@@ -295,6 +403,16 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
     <span class="pill" id="sdk-version-pill">loading...</span>
   </div>
 
+  <!-- Update banner (hidden until a newer SDK release is detected) -->
+  <div id="update-banner">
+    <span class="upd-msg" id="update-banner-msg">
+      ⚡ <strong>SDK update available</strong>
+    </span>
+    <span class="banner-spinner" id="banner-spinner"></span>
+    <button id="btn-reload-sdk" onclick="reloadSdk()">↻ Reload SDK</button>
+    <button id="btn-dismiss-banner" title="Dismiss" onclick="dismissBanner()">✕</button>
+  </div>
+
   <!-- Toolbar -->
   <div id="toolbar">
     <button class="tb-btn" id="btn-save" onclick="saveCurrentFile()" title="Save (Ctrl+S)" disabled>💾 Save</button>
@@ -321,7 +439,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
     <!-- Activity bar -->
     <div id="actbar">
       <button class="act-btn active" id="btn-explorer" data-tip="Explorer"     onclick="switchPanel('explorer')">📁</button>
-      <button class="act-btn"        id="btn-docs"      data-tip="Grammar Ref" onclick="switchPanel('docs')">📖</button>
+      <button class="act-btn"        id="btn-docs"      data-tip="Grammar Dictionary" onclick="switchPanel('docs')">📖</button>
       <button class="act-btn"        id="btn-scratch"   data-tip="New Scratchpad (.flow)" onclick="newScratchpad()">✏️</button>
       <button class="act-btn"        id="btn-about"     data-tip="About FLOW"  onclick="switchPanel('about')">ℹ️</button>
     </div>
@@ -329,7 +447,17 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
     <!-- Sidebar -->
     <div id="sidebar">
       <div id="sidebar-header">Explorer</div>
+
+      <!-- Explorer file tree -->
       <div id="file-tree"></div>
+
+      <!-- Grammar TOC (shown instead of file-tree when docs panel is active) -->
+      <div id="grammar-toc">
+        <div id="toc-search-wrap">
+          <input id="toc-search" type="search" placeholder="Filter keywords…" oninput="filterToc(this.value)" />
+        </div>
+        <div id="toc-list"></div>
+      </div>
     </div>
     <div id="resizer"></div>
 
@@ -397,6 +525,7 @@ const S = {
   scratchCount: 0,
   currentProc : null,   // AbortController for current SSE
   outputOpen  : true,
+  activePanel : 'explorer',
 };
 
 // ── Monaco setup ───────────────────────────────────────────────────────────
@@ -508,8 +637,65 @@ async function loadStatus() {
     if (!hasFlow) {
       appendOutput('info', 'No FLOW binary found in this release. Run/Validate unavailable.\n');
     }
+
+    // Show update banner if a newer release is available
+    if (data.updateAvailable) {
+      showUpdateBanner(data.sdkVersion, data.updateAvailable);
+    }
   } catch (e) {
     console.warn('Status fetch failed', e);
+  }
+}
+
+// ── Update banner ──────────────────────────────────────────────────────────
+function showUpdateBanner(current, newer) {
+  const banner = document.getElementById('update-banner');
+  document.getElementById('update-banner-msg').innerHTML =
+    `⚡ SDK <strong>v${newer}</strong> is available&ensp;(current: v${current})`;
+  banner.classList.add('visible');
+}
+
+function dismissBanner() {
+  document.getElementById('update-banner').classList.remove('visible');
+}
+
+async function reloadSdk() {
+  const btn     = document.getElementById('btn-reload-sdk');
+  const spinner = document.getElementById('banner-spinner');
+  btn.disabled  = true;
+  spinner.classList.add('visible');
+  document.getElementById('update-banner-msg').innerHTML =
+    '⚡ Downloading latest SDK…';
+
+  try {
+    const res  = await fetch('/api/load-sdk', {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({ type: 'github' }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'reload failed');
+
+    // Success — update version display and hide banner
+    S.serverStatus = { ...S.serverStatus, ...data };
+    document.getElementById('sdk-version-pill').textContent = `SDK ${data.sdkVersion}`;
+    document.getElementById('sb-version').textContent = `FLOW ${data.sdkVersion}`;
+    document.getElementById('btn-run').disabled      = !data.canRun;
+    document.getElementById('btn-validate').disabled = !data.canRun && !data.canValidate;
+
+    appendOutput('info', `SDK reloaded → v${data.sdkVersion}\n`);
+    dismissBanner();
+
+    // Refresh tree and plugins for the new SDK content
+    loadTree();
+    loadPlugins();
+  } catch (e) {
+    document.getElementById('update-banner-msg').innerHTML =
+      `⚡ Reload failed: ${e.message}`;
+    appendOutput('stderr', `SDK reload error: ${e.message}\n`);
+  } finally {
+    btn.disabled = false;
+    spinner.classList.remove('visible');
   }
 }
 
@@ -875,6 +1061,146 @@ function newScratchpad() {
   setTimeout(() => S.editor?.focus(), 100);
 }
 
+// ── Grammar Dictionary ─────────────────────────────────────────────────────
+// Static curated keyword dictionary — groups FLOW keywords by semantic
+// category with one-line descriptions. Clicking a keyword scrolls the
+// rendered doc-panel to the matching section heading.
+
+const GRAMMAR_DICT = [
+  { cat: 'File header' },
+  { kw: 'isa',      desc: 'Declare the ISA plugin to load',                        sec: '2.1' },
+  { kw: 'seed',     desc: 'Set the RNG seed for reproducible output',              sec: '4.7' },
+  { kw: 'strict',   desc: 'Promote all warnings to hard errors',                   sec: '4.9' },
+  { kw: 'use',      desc: 'Include pools, seqs and scenes from another file',      sec: '4.11' },
+
+  { cat: 'Pools & binding' },
+  { kw: 'pool',     desc: 'Declare a named register, address, imm or instr pool',  sec: '2.2' },
+  { kw: 'bind',     desc: 'Map operand kinds to their default pools',              sec: '2.2' },
+  { kw: 'any',      desc: 'Pool entry that matches any value in the kind',         sec: '2.2' },
+  { kw: 'class',    desc: 'Select all instructions belonging to an ISA class',     sec: '2.2' },
+  { kw: 'when',     desc: 'Guard a pool entry — evaluated at draw time',           sec: '2.2' },
+
+  { cat: 'Init state' },
+  { kw: 'init',     desc: 'Set initial register or memory state before generation',sec: '2.3' },
+  { kw: 'zero',     desc: 'Fill a range with zero',                                sec: '2.3' },
+  { kw: 'undef',    desc: 'Mark a range as architecturally undefined',             sec: '2.3' },
+  { kw: 'random',   desc: 'Fill a range with seeded random values',               sec: '2.3' },
+  { kw: 'fill',     desc: 'Fill a range with a constant value',                   sec: '2.3' },
+  { kw: 'pattern',  desc: 'Fill using inc/dec/walking1/checker patterns',          sec: '2.3' },
+  { kw: 'load',     desc: 'Load a binary blob from a file path',                  sec: '2.3' },
+
+  { cat: 'Rules' },
+  { kw: 'atleast',  desc: 'Require at least N% or N occurrences in scope',        sec: '2.4' },
+  { kw: 'atmost',   desc: 'Limit to at most N% or N occurrences in scope',        sec: '2.4' },
+  { kw: 'never',    desc: 'Prohibit this instruction or class entirely',           sec: '2.4' },
+  { kw: 'always',   desc: 'Mandate every instruction matches this selector',      sec: '2.4' },
+  { kw: 'property', desc: 'Select by ISA-plugin-defined instruction property',    sec: '2.4' },
+  { kw: 'within',   desc: 'Narrow a rule\'s scope to a named scene or test',      sec: '2.4' },
+  { kw: 'times',    desc: 'Express a count amount: N times',                      sec: '2.4' },
+
+  { cat: 'Structure' },
+  { kw: 'seq',      desc: 'Reusable named sequence of body statements',            sec: '2.6' },
+  { kw: 'scene',    desc: 'Reusable named scene with optional intro/outro',        sec: '2.6' },
+  { kw: 'test',     desc: 'Top-level test block — the unit of generation',        sec: '2.7' },
+  { kw: 'intro',    desc: 'Preamble emitted once before a scene or test body',    sec: '2.6' },
+  { kw: 'outro',    desc: 'Epilogue emitted once after a scene or test body',     sec: '2.6' },
+  { kw: 'repeat',   desc: 'Generate N copies of a test with derived seeds',       sec: '4.7' },
+
+  { cat: 'Generation' },
+  { kw: 'spray',    desc: 'Draw N random instructions from a pool',               sec: '4.4' },
+  { kw: 'run',      desc: 'Expand a named seq or scene inline',                   sec: '4.4' },
+  { kw: 'play',     desc: 'Pick and run one of several seqs/scenes by weight',    sec: '4.4' },
+  { kw: 'loop',     desc: 'Emit a counted loop with auto-generated control code', sec: '4.4' },
+  { kw: 'fork',     desc: 'Emit a branch with guaranteed taken/fall arms',        sec: '4.4' },
+  { kw: 'weave',    desc: 'Interleave child streams at random, order preserved',  sec: '4.5' },
+  { kw: 'atomic',   desc: 'Emit a block as one indivisible unit inside weave',   sec: '4.5' },
+  { kw: 'until',    desc: 'Spray until an expression holds (with safety cap)',    sec: '2.8' },
+  { kw: 'taken',    desc: 'The branch-taken arm inside a fork block',             sec: '2.8' },
+  { kw: 'fall',     desc: 'The fall-through arm inside a fork block',             sec: '2.8' },
+  { kw: 'using',    desc: 'Specify the branch pool to use in a fork',             sec: '2.8' },
+
+  { cat: 'Control flow' },
+  { kw: 'label',    desc: 'Define a jump target within a test or scene',          sec: '2.8' },
+  { kw: 'goto',     desc: 'Jump to a label',                                      sec: '2.8' },
+
+  { cat: 'Overrides & checks' },
+  { kw: 'with',     desc: 'Override pool bindings for the duration of a block',   sec: '2.8' },
+  { kw: 'and',      desc: 'Chain multiple overrides in a with statement',         sec: '2.8' },
+  { kw: 'expect',   desc: 'Assert an expression against the arch model at runtime',sec:'2.8' },
+  { kw: 'report',   desc: 'Print final mix or rule results for a test',           sec: '4.10' },
+  { kw: 'mix',      desc: 'Argument to report — print instruction mix table',     sec: '4.10' },
+  { kw: 'rules',    desc: 'Argument to report — print rule satisfaction table',   sec: '4.10' },
+];
+
+// Map section-number prefix → heading element in the rendered doc
+let _secMap = {};
+let _tocEntries = [];   // kept for compatibility
+
+function buildGrammarToc() {
+  _tocEntries = [];
+  _secMap = {};
+
+  // Index rendered headings by their leading section number (e.g. "2.4")
+  document.getElementById('doc-panel').querySelectorAll('h2,h3').forEach(h => {
+    const m = h.textContent.trim().match(/^(\d+(?:\.\d+)?)\b/);
+    if (m) _secMap[m[1]] = h;
+    if (!h.id) {
+      h.id = 'sec-' + h.textContent.trim().toLowerCase()
+               .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    }
+  });
+
+  const list = document.getElementById('toc-list');
+  list.innerHTML = '';
+
+  for (const item of GRAMMAR_DICT) {
+    if (item.cat !== undefined) {
+      const cat = document.createElement('div');
+      cat.className = 'dict-cat';
+      cat.textContent = item.cat;
+      list.appendChild(cat);
+      continue;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'dict-entry';
+    row.dataset.kw  = item.kw;
+    row.dataset.sec = item.sec || '';
+    row.innerHTML =
+      `<span class="dict-kw">${item.kw}</span>` +
+      `<span class="dict-desc">${item.desc}</span>`;
+
+    row.onclick = () => {
+      const target = _secMap[item.sec];
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      list.querySelectorAll('.dict-entry.active').forEach(e => e.classList.remove('active'));
+      row.classList.add('active');
+    };
+
+    list.appendChild(row);
+  }
+}
+
+function filterToc(query) {
+  const q = query.trim().toLowerCase();
+  const list = document.getElementById('toc-list');
+  list.querySelectorAll('.dict-entry').forEach(row => {
+    const matches = !q || row.dataset.kw.includes(q) ||
+                    row.querySelector('.dict-desc').textContent.toLowerCase().includes(q);
+    row.classList.toggle('dict-hidden', !matches);
+  });
+  // Hide category headers whose every sibling entry is filtered out
+  list.querySelectorAll('.dict-cat').forEach(cat => {
+    let sib = cat.nextElementSibling;
+    let anyVisible = false;
+    while (sib && !sib.classList.contains('dict-cat')) {
+      if (!sib.classList.contains('dict-hidden')) { anyVisible = true; break; }
+      sib = sib.nextElementSibling;
+    }
+    cat.style.display = anyVisible ? '' : 'none';
+  });
+}
+
 // ── Panel switching ────────────────────────────────────────────────────────
 const ABOUT_MD = `# About FLOW SDK Playground
 **FLOW** — CPU ISA-agnostic constrained-random instruction stream generator.
@@ -895,33 +1221,63 @@ flow_validate         my_script.flow
 let grammarMd = null;
 
 function switchPanel(panel) {
+  S.activePanel = panel;
   ['explorer','docs','about'].forEach(p => {
     document.getElementById('btn-' + p)?.classList.toggle('active', p === panel);
   });
   document.getElementById('sidebar-header').textContent =
-    { explorer: 'Explorer', docs: 'Grammar Reference', about: 'About' }[panel] || panel;
-  document.getElementById('file-tree').style.display = panel === 'explorer' ? '' : 'none';
+    { explorer: 'Explorer', docs: 'Grammar Dictionary', about: 'About' }[panel] || panel;
 
-  if (panel === 'docs') loadGrammarRef();
-  if (panel === 'about') showStaticDoc(ABOUT_MD, 'About FLOW');
+  // Show/hide file-tree vs grammar-toc
+  const isDocsPanel = (panel === 'docs');
+  document.getElementById('file-tree').style.display    = isDocsPanel ? 'none' : '';
+  const tocEl = document.getElementById('grammar-toc');
+  if (isDocsPanel) {
+    tocEl.classList.add('visible');
+  } else {
+    tocEl.classList.remove('visible');
+    // Reset search when leaving
+    document.getElementById('toc-search').value = '';
+    filterToc('');
+  }
+
+  if (panel === 'docs')  loadGrammarRef();
+  if (panel === 'about') showStaticDoc(ABOUT_MD, 'About FLOW', false);
 }
 
 async function loadGrammarRef() {
-  if (grammarMd) { showStaticDoc(grammarMd, 'Grammar Reference'); return; }
+  if (grammarMd) {
+    showStaticDoc(grammarMd, 'Grammar Reference', /*buildToc=*/true);
+    return;
+  }
   try {
     const res = await fetch('/api/file?path=docs/grammar_v2.md');
-    if (res.ok) { const d = await res.json(); grammarMd = d.content; showStaticDoc(grammarMd, 'Grammar Reference'); }
-    else showStaticDoc('> Grammar reference not found.', 'Grammar Reference');
-  } catch { showStaticDoc('> Could not load grammar reference.', 'Grammar Reference'); }
+    if (res.ok) {
+      const d = await res.json();
+      grammarMd = d.content;
+      showStaticDoc(grammarMd, 'Grammar Reference', /*buildToc=*/true);
+    } else {
+      showStaticDoc('> Grammar reference not found in this SDK release.', 'Grammar Reference', false);
+    }
+  } catch {
+    showStaticDoc('> Could not load grammar reference.', 'Grammar Reference', false);
+  }
 }
 
-function showStaticDoc(md, title) {
+function showStaticDoc(md, title, buildToc = false) {
   document.getElementById('welcome').style.display   = 'none';
   document.getElementById('monaco-container').style.display = 'none';
-  document.getElementById('doc-panel').style.display = 'block';
-  document.getElementById('doc-panel').innerHTML     = marked.parse(md);
+  const docPanel = document.getElementById('doc-panel');
+  docPanel.style.display = 'block';
+  docPanel.innerHTML     = marked.parse(md);
   document.getElementById('sb-path').textContent = title;
   document.getElementById('sb-lang').textContent = 'markdown';
+
+  // Build/rebuild TOC immediately after innerHTML is set (synchronous DOM)
+  if (buildToc) {
+    _tocEntries = [];   // reset so we always rebuild fresh
+    buildGrammarToc();
+  }
 }
 
 // ── Sidebar resizer ────────────────────────────────────────────────────────
