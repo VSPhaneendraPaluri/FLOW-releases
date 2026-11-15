@@ -21,10 +21,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ────────────────────────────────────────────────────────────────────────────────
-SCOPE OF THIS LICENSE
+Scope
 ────────────────────────────────────────────────────────────────────────────────
 
-This MIT License applies to the FLOW ISA SDK distributed in this repository:
+This MIT License applies to the FLOW ISA Plugin SDK:
 
   include/flow/isa/      — SDK-stable plugin interface headers
   sdk/cmake/             — FlowPlugin.cmake build helpers
@@ -32,23 +32,12 @@ This MIT License applies to the FLOW ISA SDK distributed in this repository:
   sdk/templates/         — Starter plugin templates
   sdk/examples/          — Worked example ISA plugins
 
-These are the headers and helpers that ISA plugin authors compile against.
 Plugins you build against this SDK are your own independent work and carry
 no license obligations beyond this MIT notice.
 
-────────────────────────────────────────────────────────────────────────────────
-ENGINE BINARY
-────────────────────────────────────────────────────────────────────────────────
-
-Every release archive in this repository also includes pre-built FLOW engine
-binaries for each supported platform:
-
-  flow-<platform>-<arch>[.exe]           — Instruction stream generator CLI
-  flow_validate-<platform>-<arch>[.exe]  — Script validator CLI
-
-(e.g. flow-linux-x86_64, flow-windows-x86_64.exe)
-
-These binaries are NOT covered by the MIT License above. They are proprietary
-and governed by the separate Binary License — see LICENSE-BIN.
-
-The engine source code is proprietary and is not distributed here.
+Pre-built Binaries
+──────────────────
+SDK distributions may include pre-built FLOW binaries (flow.exe,
+flow-validate, and related tools). These binaries are proprietary software
+and are NOT covered by this MIT License. Refer to the project repository
+for the applicable license terms before use.

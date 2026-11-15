@@ -38,9 +38,7 @@ flow-sdk-<version>-<platform>.zip
 ├── docs/                 Plugin authoring guide
 ├── templates/            Starter plugin templates
 ├── examples/             Worked example with a toy ISA
-├── LICENSE               MIT license (SDK)
-├── LICENSE-BIN           Binary terms (platform binaries)
-└── NOTICE                Plain-English license summary
+└── LICENSE               MIT license (SDK)
 ```
 
 ---
@@ -173,7 +171,7 @@ Exit 0 = clean; non-zero = errors reported to stderr.
 | `flow-*`, `flow_validate-*` (platform binaries) | **Proprietary** — use freely, do not redistribute |
 
 Plugins you build against the SDK headers are entirely your own work.
-See `LICENSE`, `LICENSE-BIN`, and `NOTICE` in the archive for the full terms.
+See `LICENSE` in the archive for the full terms.
 
 ---
 
