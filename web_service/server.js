@@ -536,12 +536,34 @@ function findFileInSdk(dir, name) {
     return null;
 }
 
-function writeTempScript(content, scriptPath, prefix) {
+// Derive a clean base name from the original script path so the binary's output
+// files follow the fixture naming convention: <scriptname>.<testname>.asm
+function scriptBaseName(scriptPath, content) {
+    if (scriptPath) {
+        const stem = path.basename(scriptPath, '.flow');
+        if (stem) return stem;
+    }
+    // Fall back to the first `test <name>` block in content
+    const m = content.match(/\btest\s+([A-Za-z_][A-Za-z0-9_]*)/);
+    if (m) return m[1];
+    return 'scratch';
+}
+
+function writeTempScript(content, scriptPath, _prefix) {
+    const base = scriptBaseName(scriptPath, content);
+
+    // Each run gets its own subdirectory so output files from concurrent runs
+    // don't collide and cleanup is straightforward (remove the whole dir).
+    // The temp script is named <base>.flow so the binary produces:
+    //   <base>.<testname>.asm  (e.g. smoke.smoke_alu.asm)
+
     // 1. Prefer adjacent to the original SDK file (scriptPath provided by client)
     if (scriptPath && SDK_ROOT) {
         const dir = path.join(SDK_ROOT, path.dirname(scriptPath));
         if (fs.existsSync(dir)) {
-            const tmp = path.join(dir, `${prefix}_${Date.now()}.flow`);
+            const runDir = path.join(dir, `_run_${Date.now()}`);
+            fs.mkdirSync(runDir, { recursive: true });
+            const tmp = path.join(runDir, `${base}.flow`);
             fs.writeFileSync(tmp, content, 'utf8');
             return tmp;
         }
@@ -553,14 +575,18 @@ function writeTempScript(content, scriptPath, prefix) {
             const rulesName = path.basename(m[1]);
             const found = findFileInSdk(SDK_ROOT, rulesName);
             if (found) {
-                const tmp = path.join(path.dirname(found), `${prefix}_${Date.now()}.flow`);
+                const runDir = path.join(path.dirname(found), `_run_${Date.now()}`);
+                fs.mkdirSync(runDir, { recursive: true });
+                const tmp = path.join(runDir, `${base}.flow`);
                 fs.writeFileSync(tmp, content, 'utf8');
                 return tmp;
             }
         }
     }
-    // 3. Fallback: /tmp (absolute path passed to binary)
-    const tmp = path.join(os.tmpdir(), `${prefix}_${Date.now()}.flow`);
+    // 3. Fallback: system temp dir
+    const runDir = path.join(os.tmpdir(), `_flow_run_${Date.now()}`);
+    fs.mkdirSync(runDir, { recursive: true });
+    const tmp = path.join(runDir, `${base}.flow`);
     fs.writeFileSync(tmp, content, 'utf8');
     return tmp;
 }
@@ -593,12 +619,11 @@ app.post('/api/run', (req, res) => {
     proc.stderr.on('data', d => sseMsg(res, 'stderr', d.toString()));
     proc.on('error', e => { sseMsg(res, 'stderr', `Error: ${e.message}\n`); sseDone(res, -1); });
     proc.on('close', code => {
-        try { fs.unlinkSync(tmp); } catch {}
-        // Stream any generated output files (.asm, .s, .txt) with the same stem
+        // Stream any generated output files (.asm, .s, .txt) before cleanup
         const stem = path.basename(tmp, '.flow');
         try {
             const outFiles = fs.readdirSync(cwd)
-                .filter(f => f.startsWith(stem) && f !== path.basename(tmp))
+                .filter(f => f !== path.basename(tmp))   // skip the input script itself
                 .sort();
             for (const f of outFiles) {
                 try {
@@ -608,6 +633,8 @@ app.post('/api/run', (req, res) => {
                 } catch {}
             }
         } catch {}
+        // Remove the entire run directory (temp script + all outputs)
+        try { fs.rmSync(cwd, { recursive: true, force: true }); } catch {}
         sseMsg(res, code === 0 ? 'info' : 'stderr', `\n[Exited with code ${code}]\n`);
         sseDone(res, code);
     });
