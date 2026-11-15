@@ -15,9 +15,14 @@ app.use(express.json({ limit: '4mb' }));
 const isWin = process.platform === 'win32';
 
 // ── Paths ──────────────────────────────────────────────────────────────────
-const RUNTIME_DIR = path.join(__dirname, 'sdk_runtime');
-let   SDK_ROOT    = null;
-let   SDK_VERSION = 'unknown';
+const RUNTIME_DIR        = path.join(__dirname, 'sdk_runtime');
+const SDK_VERSION_MARKER = path.join(RUNTIME_DIR, '.sdk_version_tag');
+let   SDK_ROOT           = null;
+let   SDK_VERSION        = 'unknown';   // human-readable release tag, e.g. "0.9.0"
+let   SDK_API_VERSION    = 'unknown';   // internal ABI constant from types.hpp, e.g. "0x00000900"
+let   SDK_RELEASE_DATE   = null;        // ISO 8601 published_at from GitHub
+let   SDK_RELEASE_ASSET  = null;        // zip filename that was downloaded
+let   SDK_UPDATE_AVAILABLE = null;      // set to newer tag string when a newer release is detected
 
 // ── Binary detection ───────────────────────────────────────────────────────
 let FLOW_BIN  = null;
@@ -48,13 +53,30 @@ function detectBinaries() {
 }
 
 function detectVersion() {
-    SDK_VERSION = 'unknown';
+    // Read the internal ABI version constant from types.hpp.
+    // This is a packed uint32 (major:16 | minor:8 | patch:8), e.g. 0x00000900 = 0.9.0.
+    // It is stored separately as SDK_API_VERSION and is NOT used as the display version.
+    // The human-readable release tag (SDK_VERSION) is set by the caller from the GitHub
+    // release metadata or the ZIP filename before this function is called.
+    SDK_API_VERSION = 'unknown';
     const vFile = path.join(SDK_ROOT, 'include', 'flow', 'isa', 'types.hpp');
     if (!fs.existsSync(vFile)) return;
     try {
         const src = fs.readFileSync(vFile, 'utf8');
-        const m = src.match(/FLOW_ISA_API_VERSION\s*=\s*(0x[0-9A-Fa-f]+|[0-9]+)/);
-        if (m) SDK_VERSION = m[1];
+        const m   = src.match(/FLOW_ISA_API_VERSION\s*=\s*(0x[0-9A-Fa-f]+|[0-9]+)/);
+        if (m) {
+            SDK_API_VERSION = m[1];
+            // Decode packed version as a fallback display version only if no tag was set.
+            if (SDK_VERSION === 'unknown') {
+                const v = parseInt(m[1], 16);
+                if (!isNaN(v)) {
+                    const major = (v >>> 16) & 0xFFFF;
+                    const minor = (v >>>  8) & 0x00FF;
+                    const patch =  v         & 0x00FF;
+                    SDK_VERSION = `${major}.${minor}.${patch}`;
+                }
+            }
+        }
     } catch {}
 }
 
@@ -78,6 +100,8 @@ function extractZipBuffer(buf) {
     SDK_ROOT = RUNTIME_DIR;
     detectVersion();
     detectBinaries();
+    // Write a version marker so the restart-reuse path can compare against GitHub.
+    try { fs.writeFileSync(SDK_VERSION_MARKER, SDK_VERSION, 'utf8'); } catch {}
 }
 
 // ── HTTP download (follows redirects) ─────────────────────────────────────
@@ -114,12 +138,13 @@ function download(url, token, redirects = 0) {
 // ── Loader: local file (Windows dev) ──────────────────────────────────────
 function loadFromPath(zipPath) {
     console.log(`[sdk] Loading from path: ${zipPath}`);
+    // Pre-set version from filename so detectVersion() doesn't overwrite it.
+    const mName = path.basename(zipPath).match(/flow-sdk-v?(\d+\.\d+\.\d+)/i);
+    SDK_VERSION       = mName ? mName[1] : 'unknown';
+    SDK_RELEASE_DATE  = null;
+    SDK_RELEASE_ASSET = path.basename(zipPath);
     extractZipBuffer(fs.readFileSync(zipPath));
-    if (SDK_VERSION === 'unknown') {
-        const m = path.basename(zipPath).match(/flow-sdk-(\d+\.\d+\.\d+)/i);
-        if (m) SDK_VERSION = m[1];
-    }
-    console.log(`[sdk] Loaded. version=${SDK_VERSION}`);
+    console.log(`[sdk] Loaded. version=${SDK_VERSION} apiVersion=${SDK_API_VERSION}`);
 }
 
 // ── Loader: GitHub latest release ─────────────────────────────────────────
@@ -170,14 +195,17 @@ async function loadFromGitHub() {
     if (!asset) asset = assets.find(a => a.name.endsWith('.zip'));
     if (!asset) throw new Error('No ZIP asset found in latest release');
 
+    // Capture human-readable release metadata BEFORE extracting the ZIP.
+    // tag_name is always present (e.g. "v0.9.0") and is the canonical display version.
+    // Strip the leading "v" for consistency with semver display expectations.
+    SDK_VERSION       = (release.tag_name || 'unknown').replace(/^v/, '');
+    SDK_RELEASE_DATE  = release.published_at || null;
+    SDK_RELEASE_ASSET = asset.name;
+
     console.log(`[sdk] Downloading asset: ${asset.name} (${(asset.size / 1e6).toFixed(1)} MB)`);
     const buf = await download(asset.browser_download_url, TOKEN);
     extractZipBuffer(buf);
-    if (SDK_VERSION === 'unknown') {
-        const m = asset.name.match(/flow-sdk-(\d+\.\d+\.\d+)/i);
-        if (m) SDK_VERSION = m[1];
-    }
-    console.log(`[sdk] Ready. version=${SDK_VERSION}`);
+    console.log(`[sdk] Ready. version=${SDK_VERSION} apiVersion=${SDK_API_VERSION} released=${SDK_RELEASE_DATE}`);
 }
 
 // ── Loader: explicit URL ───────────────────────────────────────────────────
@@ -186,6 +214,67 @@ async function loadFromUrl(url) {
     const buf = await download(url, process.env.GITHUB_TOKEN || '');
     extractZipBuffer(buf);
     console.log(`[sdk] Ready. version=${SDK_VERSION}`);
+}
+
+// ── Lightweight GitHub version check (no download) ────────────────────────
+// Returns the latest release tag_name (e.g. "v0.9.0") without downloading the ZIP.
+async function fetchLatestTag() {
+    const https  = require('https');
+    const OWNER  = process.env.GITHUB_OWNER;
+    const REPO   = process.env.GITHUB_REPO  || 'FLOW-releases';
+    const TOKEN  = process.env.GITHUB_TOKEN || '';
+    if (!OWNER) return null;
+
+    return new Promise((resolve, reject) => {
+        const opts = {
+            hostname: 'api.github.com',
+            path    : `/repos/${OWNER}/${REPO}/releases/latest`,
+            headers : {
+                'User-Agent'          : 'flow-sdk-playground/1.0',
+                'Accept'              : 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28',
+            },
+            timeout: 10_000,
+        };
+        if (TOKEN) opts.headers['Authorization'] = `Bearer ${TOKEN}`;
+        const req = https.get(opts, res => {
+            const chunks = [];
+            res.on('data', c => chunks.push(c));
+            res.on('end', () => {
+                try {
+                    const r = JSON.parse(Buffer.concat(chunks).toString());
+                    resolve(r.tag_name || null);
+                } catch { resolve(null); }
+            });
+        });
+        req.on('error',   reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    });
+}
+
+// ── Periodic auto-update check ────────────────────────────────────────────
+// Runs every 6 hours on Render. If a newer GitHub release exists, re-fetches the SDK.
+// This keeps a long-running instance current without requiring a re-deploy.
+const AUTO_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+async function checkForUpdate() {
+    if (!process.env.GITHUB_OWNER) return; // only on Render / cloud
+    try {
+        const latestTag   = await fetchLatestTag();
+        const latestClean = (latestTag || '').replace(/^v/, '');
+        if (!latestClean || latestClean === SDK_VERSION) {
+            SDK_UPDATE_AVAILABLE = null; // already on latest
+            return;
+        }
+        // Don't auto-reload — set a flag so the UI can show a "new version" banner.
+        // The user can then click "Reload SDK" to apply it without disrupting in-flight runs.
+        if (SDK_UPDATE_AVAILABLE !== latestClean) {
+            console.log(`[sdk] New release available: ${SDK_VERSION} → ${latestClean}`);
+            SDK_UPDATE_AVAILABLE = latestClean;
+        }
+    } catch (e) {
+        console.warn('[sdk] Update check failed:', e.message);
+    }
 }
 
 // ── Startup ────────────────────────────────────────────────────────────────
@@ -210,11 +299,39 @@ async function startup() {
             console.log(`[sdk] Auto-detected local ZIP: ${localZip}`);
             loadFromPath(localZip);
         } else if (process.env.GITHUB_OWNER) {
-            // Render (or any cloud): fetch from GitHub releases
-            await loadFromGitHub();
+            // Render (or any cloud): fetch from GitHub releases.
+            // If sdk_runtime/ already exists (container restart without redeploy),
+            // check whether a newer release is available on GitHub before reusing.
+            if (fs.existsSync(RUNTIME_DIR) && fs.existsSync(SDK_VERSION_MARKER)) {
+                const storedTag = fs.readFileSync(SDK_VERSION_MARKER, 'utf8').trim();
+                try {
+                    const latestTag = await fetchLatestTag();
+                    const latestClean = (latestTag || '').replace(/^v/, '');
+                    if (storedTag && storedTag === latestClean) {
+                        // Same version — safe to reuse, no need to re-download.
+                        SDK_ROOT = RUNTIME_DIR;
+                        SDK_VERSION = storedTag;
+                        detectVersion();
+                        detectBinaries();
+                        console.log(`[sdk] Reusing sdk_runtime/ — already at latest (${SDK_VERSION})`);
+                    } else {
+                        console.log(`[sdk] Newer release detected (${storedTag} → ${latestClean}). Re-fetching…`);
+                        await loadFromGitHub();
+                    }
+                } catch (checkErr) {
+                    // If the version check fails, re-fetch to be safe.
+                    console.warn(`[sdk] Version check failed (${checkErr.message}). Re-fetching from GitHub…`);
+                    await loadFromGitHub();
+                }
+            } else {
+                await loadFromGitHub();
+            }
         } else if (fs.existsSync(RUNTIME_DIR)) {
-            // Reuse a previously extracted runtime (e.g. dev restart without ZIP)
+            // Local dev restart without a ZIP: reuse extracted runtime as-is.
             SDK_ROOT = RUNTIME_DIR;
+            const storedTag = fs.existsSync(SDK_VERSION_MARKER)
+                ? fs.readFileSync(SDK_VERSION_MARKER, 'utf8').trim() : null;
+            if (storedTag) SDK_VERSION = storedTag;
             detectVersion();
             detectBinaries();
             console.log(`[sdk] Reusing sdk_runtime/ (version=${SDK_VERSION})`);
@@ -233,10 +350,19 @@ async function startup() {
         }
     }
 
-    console.log(`\n  SDK root    : ${SDK_ROOT}`);
-    console.log(`  SDK version : ${SDK_VERSION}`);
-    console.log(`  flow binary : ${FLOW_BIN  || '(not found)'}`);
-    console.log(`  validate    : ${VALID_BIN || '(not found)'}\n`);
+    console.log(`\n  SDK root      : ${SDK_ROOT}`);
+    console.log(`  SDK version   : ${SDK_VERSION}`);
+    console.log(`  SDK API ver   : ${SDK_API_VERSION}`);
+    console.log(`  Released      : ${SDK_RELEASE_DATE || '(unknown)'}`);
+    console.log(`  Asset         : ${SDK_RELEASE_ASSET || '(unknown)'}`);
+    console.log(`  flow binary   : ${FLOW_BIN  || '(not found)'}`);
+    console.log(`  validate      : ${VALID_BIN || '(not found)'}\n`);
+
+    // Start periodic auto-update check (Render / cloud only).
+    if (process.env.GITHUB_OWNER) {
+        setInterval(checkForUpdate, AUTO_CHECK_INTERVAL_MS);
+        console.log(`[sdk] Auto-update check scheduled every ${AUTO_CHECK_INTERVAL_MS / 3600000}h`);
+    }
 }
 
 // ── API: health check (used by Render) ────────────────────────────────────
@@ -244,13 +370,17 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // ── API: status ────────────────────────────────────────────────────────────
 app.get('/api/status', (_req, res) => res.json({
-    sdkVersion : SDK_VERSION,
-    sdkRoot    : SDK_ROOT ? path.basename(SDK_ROOT) : null,
-    flowBin    : FLOW_BIN  ? path.basename(FLOW_BIN)  : null,
-    validateBin: VALID_BIN ? path.basename(VALID_BIN) : null,
-    canRun     : !!FLOW_BIN,
-    canValidate: !!(VALID_BIN || FLOW_BIN),
-    platform   : process.platform,
+    sdkVersion      : SDK_VERSION,          // human-readable release tag, e.g. "0.9.0"
+    sdkApiVersion   : SDK_API_VERSION,      // packed ABI constant from types.hpp, e.g. "0x00000900"
+    sdkReleaseDate  : SDK_RELEASE_DATE,     // ISO 8601 published_at, e.g. "2025-04-01T00:00:00Z"
+    sdkAsset        : SDK_RELEASE_ASSET,    // zip filename, e.g. "flow-sdk-0.9.0-linux-x86_64.zip"
+    sdkRoot         : SDK_ROOT ? path.basename(SDK_ROOT) : null,
+    flowBin         : FLOW_BIN  ? path.basename(FLOW_BIN)  : null,
+    validateBin     : VALID_BIN ? path.basename(VALID_BIN) : null,
+    canRun          : !!FLOW_BIN,
+    canValidate     : !!(VALID_BIN || FLOW_BIN),
+    platform        : process.platform,
+    updateAvailable : SDK_UPDATE_AVAILABLE, // non-null when a newer GitHub release exists
 }));
 
 // ── API: load SDK (path | url | github) ───────────────────────────────────
@@ -268,6 +398,7 @@ app.post('/api/load-sdk', async (req, res) => {
         } else {
             return res.status(400).json({ error: 'type must be path | url | github' });
         }
+        SDK_UPDATE_AVAILABLE = null; // clear banner — user has just loaded the latest
         res.json({
             ok: true, sdkVersion: SDK_VERSION,
             canRun: !!FLOW_BIN, canValidate: !!(VALID_BIN || FLOW_BIN),
