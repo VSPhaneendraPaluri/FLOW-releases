@@ -213,6 +213,33 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
 #toc-search:focus { border-color: var(--accent); }
 #toc-search::placeholder { color: var(--fg-secondary); }
 
+#toc-filter-row {
+  display: flex; align-items: center; gap: 4px;
+  padding: 2px 10px 6px; flex-shrink: 0; flex-wrap: wrap;
+}
+.toc-filter-btn {
+  flex: 1; padding: 3px 6px; font-size: 10px; font-family: var(--font-ui);
+  background: #2d2d2d; border: 1px solid var(--border);
+  color: var(--fg-secondary); border-radius: 3px; cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+  white-space: nowrap; text-align: center;
+}
+.toc-filter-btn:hover { background: var(--bg-hover); color: var(--fg-primary); }
+.toc-filter-btn.active {
+  background: #1a3a52; border-color: var(--accent); color: var(--fg-primary);
+}
+.toc-sort-btn {
+  padding: 3px 7px; font-size: 10px; font-family: var(--font-mono);
+  background: #2d2d2d; border: 1px solid var(--border);
+  color: var(--fg-secondary); border-radius: 3px; cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+  white-space: nowrap;
+}
+.toc-sort-btn:hover { background: var(--bg-hover); color: var(--fg-primary); }
+.toc-sort-btn.active {
+  background: #2a1a52; border-color: #9b59b6; color: #c39bd3;
+}
+
 #toc-list {
   flex: 1;
   overflow-y: auto;
@@ -455,6 +482,11 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
       <div id="grammar-toc">
         <div id="toc-search-wrap">
           <input id="toc-search" type="search" placeholder="Filter keywords…" oninput="filterToc(this.value)" />
+        </div>
+        <div id="toc-filter-row">
+          <button class="toc-filter-btn"  data-filter="rules"  onclick="setTocFilter('rules')">.rules</button>
+          <button class="toc-filter-btn"  data-filter="flow"   onclick="setTocFilter('flow')">.flow</button>
+          <button class="toc-sort-btn"    id="toc-sort-btn"    onclick="toggleTocSort()" title="Sort A–Z">A–Z</button>
         </div>
         <div id="toc-list"></div>
       </div>
@@ -1067,156 +1099,211 @@ function newScratchpad() {
 // rendered doc-panel to the matching section heading.
 
 const GRAMMAR_DICT = [
-  { cat: 'File header' },
-  { kw: 'isa',      desc: 'Declare the ISA plugin to load',                        sec: '2.1' },
-  { kw: 'seed',     desc: 'Set the RNG seed for reproducible output',              sec: '4.7' },
-  { kw: 'strict',   desc: 'Promote all warnings to hard errors',                   sec: '4.9' },
-  { kw: 'use',      desc: 'Include pools, seqs and scenes from another file',      sec: '4.11' },
+  // ── .rules file ──────────────────────────────────────────────────────────
+  { cat: '.rules — ISA & pools', file: 'rules' },
+  { kw: 'isa',       desc: 'Name the ISA plugin this file targets',                       file: 'rules' },
+  { kw: 'pool',      desc: 'Declare a named reg / addr / imm / instr pool with weights',  file: 'rules' },
+  { kw: 'reserve',   desc: 'Permanently remove registers from all random draws',          file: 'rules' },
 
-  { cat: 'Pools & binding' },
-  { kw: 'pool',     desc: 'Declare a named register, address, imm or instr pool',  sec: '2.2' },
-  { kw: 'bind',     desc: 'Map operand kinds to their default pools',              sec: '2.2' },
-  { kw: 'any',      desc: 'Pool entry that matches any value in the kind',         sec: '2.2' },
-  { kw: 'class',    desc: 'Select all instructions belonging to an ISA class',     sec: '2.2' },
-  { kw: 'when',     desc: 'Guard a pool entry — evaluated at draw time',           sec: '2.2' },
+  { cat: '.rules — Constraints', file: 'rules' },
+  { kw: 'forbid',    desc: 'Prohibit an instruction pattern; optionally lock it',         file: 'rules' },
+  { kw: 'require',   desc: 'Mandate a condition on a generated instruction',              file: 'rules' },
+  { kw: 'when',      desc: 'Guard a forbid/require rule — evaluated at draw time',        file: 'rules' },
+  { kw: 'as',        desc: 'Name a rule so it can be referenced by relax / override',     file: 'rules' },
+  { kw: 'lock',      desc: 'Make a forbid/require rule unbreakable by any test',          file: 'rules' },
+  { kw: 'for',       desc: 'Identify which operand a require condition applies to',       file: 'rules' },
+  { kw: 'in',        desc: 'Pool-membership guard: when instr in <pool>',                 file: 'rules' },
+  { kw: 'group',     desc: 'Bundle named rules so a test can relax them together',        file: 'rules' },
 
-  { cat: 'Init state' },
-  { kw: 'init',     desc: 'Set initial register or memory state before generation',sec: '2.3' },
-  { kw: 'zero',     desc: 'Fill a range with zero',                                sec: '2.3' },
-  { kw: 'undef',    desc: 'Mark a range as architecturally undefined',             sec: '2.3' },
-  { kw: 'random',   desc: 'Fill a range with seeded random values',               sec: '2.3' },
-  { kw: 'fill',     desc: 'Fill a range with a constant value',                   sec: '2.3' },
-  { kw: 'pattern',  desc: 'Fill using inc/dec/walking1/checker patterns',          sec: '2.3' },
-  { kw: 'load',     desc: 'Load a binary blob from a file path',                  sec: '2.3' },
+  // ── .flow file ───────────────────────────────────────────────────────────
+  { cat: '.flow — File level', file: 'flow' },
+  { kw: 'use',       desc: 'Import pools, scenes and rules from a .rules or .flow file',  file: 'flow' },
+  { kw: 'seed',      desc: 'Pin the RNG seed — same seed + script = identical output',    file: 'flow' },
+  { kw: 'strict',    desc: 'Promote all warnings to hard errors',                         file: 'flow' },
+  { kw: 'const',     desc: 'Declare a compile-time integer constant',                     file: 'flow' },
+  { kw: 'defaults',  desc: 'Set the default pool for each operand kind',                  file: 'flow' },
+  { kw: 'mix',       desc: 'Declare instruction-mix targets; engine steers draws to meet them', file: 'flow' },
+  { kw: 'before',    desc: 'Run a block before each test (file-level) or this test',      file: 'flow' },
+  { kw: 'after',     desc: 'Run a block after each test (file-level) or this test',       file: 'flow' },
+  { kw: 'init',      desc: 'Set memory or register state before a test runs',             file: 'flow' },
 
-  { cat: 'Rules' },
-  { kw: 'atleast',  desc: 'Require at least N% or N occurrences in scope',        sec: '2.4' },
-  { kw: 'atmost',   desc: 'Limit to at most N% or N occurrences in scope',        sec: '2.4' },
-  { kw: 'never',    desc: 'Prohibit this instruction or class entirely',           sec: '2.4' },
-  { kw: 'always',   desc: 'Mandate every instruction matches this selector',      sec: '2.4' },
-  { kw: 'property', desc: 'Select by ISA-plugin-defined instruction property',    sec: '2.4' },
-  { kw: 'within',   desc: 'Narrow a rule\'s scope to a named scene or test',      sec: '2.4' },
-  { kw: 'times',    desc: 'Express a count amount: N times',                      sec: '2.4' },
+  { cat: '.flow — Structure', file: 'flow' },
+  { kw: 'scene',     desc: 'Reusable named parameterised fragment of test logic',         file: 'flow' },
+  { kw: 'test',      desc: 'Top-level unit of generation — produces one instruction stream', file: 'flow' },
 
-  { cat: 'Structure' },
-  { kw: 'seq',      desc: 'Reusable named sequence of body statements',            sec: '2.6' },
-  { kw: 'scene',    desc: 'Reusable named scene with optional intro/outro',        sec: '2.6' },
-  { kw: 'test',     desc: 'Top-level test block — the unit of generation',        sec: '2.7' },
-  { kw: 'intro',    desc: 'Preamble emitted once before a scene or test body',    sec: '2.6' },
-  { kw: 'outro',    desc: 'Epilogue emitted once after a scene or test body',     sec: '2.6' },
-  { kw: 'repeat',   desc: 'Generate N copies of a test with derived seeds',       sec: '4.7' },
+  { cat: '.flow — Generation', file: 'flow' },
+  { kw: 'crand',     desc: 'Draw N random instructions from a pool (constrained-random)', file: 'flow' },
+  { kw: 'until',     desc: 'Draw until a condition holds — use with max as a safety cap', file: 'flow' },
+  { kw: 'max',       desc: 'Safety cap on an until expression — errors if hit',           file: 'flow' },
+  { kw: 'run',       desc: 'Expand a named scene inline',                                 file: 'flow' },
+  { kw: 'repeat',    desc: 'Execute a block N times as independent random draws',         file: 'flow' },
+  { kw: 'loop',      desc: 'Emit a counted loop with auto-generated counter/branch code', file: 'flow' },
+  { kw: 'choose',    desc: 'Pick one weighted arm per iteration (choose one / N times)',  file: 'flow' },
+  { kw: 'interleave',desc: 'Merge child blocks, preserving per-block order',              file: 'flow' },
+  { kw: 'atomic',    desc: 'Indivisible unit inside interleave — never split by interleaver', file: 'flow' },
+  { kw: 'branch',    desc: 'Emit a branch with weighted taken / not_taken arms',          file: 'flow' },
+  { kw: 'taken',     desc: 'The branch-taken arm inside a branch block',                  file: 'flow' },
+  { kw: 'not_taken', desc: 'The fall-through arm inside a branch block',                  file: 'flow' },
 
-  { cat: 'Generation' },
-  { kw: 'spray',    desc: 'Draw N random instructions from a pool',               sec: '4.4' },
-  { kw: 'run',      desc: 'Expand a named seq or scene inline',                   sec: '4.4' },
-  { kw: 'play',     desc: 'Pick and run one of several seqs/scenes by weight',    sec: '4.4' },
-  { kw: 'loop',     desc: 'Emit a counted loop with auto-generated control code', sec: '4.4' },
-  { kw: 'fork',     desc: 'Emit a branch with guaranteed taken/fall arms',        sec: '4.4' },
-  { kw: 'weave',    desc: 'Interleave child streams at random, order preserved',  sec: '4.5' },
-  { kw: 'atomic',   desc: 'Emit a block as one indivisible unit inside weave',   sec: '4.5' },
-  { kw: 'until',    desc: 'Spray until an expression holds (with safety cap)',    sec: '2.8' },
-  { kw: 'taken',    desc: 'The branch-taken arm inside a fork block',             sec: '2.8' },
-  { kw: 'fall',     desc: 'The fall-through arm inside a fork block',             sec: '2.8' },
-  { kw: 'using',    desc: 'Specify the branch pool to use in a fork',             sec: '2.8' },
-
-  { cat: 'Control flow' },
-  { kw: 'label',    desc: 'Define a jump target within a test or scene',          sec: '2.8' },
-  { kw: 'goto',     desc: 'Jump to a label',                                      sec: '2.8' },
-
-  { cat: 'Overrides & checks' },
-  { kw: 'with',     desc: 'Override pool bindings for the duration of a block',   sec: '2.8' },
-  { kw: 'and',      desc: 'Chain multiple overrides in a with statement',         sec: '2.8' },
-  { kw: 'expect',   desc: 'Assert an expression against the arch model at runtime',sec:'2.8' },
-  { kw: 'report',   desc: 'Print final mix or rule results for a test',           sec: '4.10' },
-  { kw: 'mix',      desc: 'Argument to report — print instruction mix table',     sec: '4.10' },
-  { kw: 'rules',    desc: 'Argument to report — print rule satisfaction table',   sec: '4.10' },
+  { cat: '.flow — Overrides & checks', file: 'flow' },
+  { kw: 'with',      desc: 'Override pool bindings for the duration of a block',          file: 'flow' },
+  { kw: 'relax',     desc: 'Disable a named rule or group for this test only',            file: 'flow' },
+  { kw: 'override',  desc: 'Replace the body of a named rule for this test only',         file: 'flow' },
+  { kw: 'check',     desc: 'Assert a register or memory value against the arch model',    file: 'flow' },
+  { kw: 'expect',    desc: 'Declare that enclosed instructions should raise a fault',     file: 'flow' },
+  { kw: 'fault',     desc: 'Names the expected fault kind inside an expect block',        file: 'flow' },
+  { kw: 'label',     desc: 'Define a jump target within a test or scene',                 file: 'flow' },
+  { kw: 'goto',      desc: 'Jump unconditionally to a label',                             file: 'flow' },
+  { kw: 'report',    desc: 'Print mix or rule results at end of test (mix / rules)',      file: 'flow' },
 ];
 
-// Map section-number prefix → heading element in the rendered doc
-let _secMap = {};
+// ── Grammar Dictionary state ───────────────────────────────────────────────
+let _secMap    = {};
 let _tocEntries = [];   // kept for compatibility
+let _tocFilter  = 'all';   // 'all' | 'rules' | 'flow'
+let _tocSortAZ  = false;
 
-function buildGrammarToc() {
-  _tocEntries = [];
+// Index rendered headings by keyword text (### `keyword`) for scroll-to
+function _indexDocHeadings() {
   _secMap = {};
-
-  // Index rendered headings by their leading section number (e.g. "2.4")
-  document.getElementById('doc-panel').querySelectorAll('h2,h3').forEach(h => {
-    const m = h.textContent.trim().match(/^(\d+(?:\.\d+)?)\b/);
-    if (m) _secMap[m[1]] = h;
+  document.getElementById('doc-panel').querySelectorAll('h3').forEach(h => {
+    // heading text like "`crand`" or "`forbid`" — extract the keyword
+    const m = h.textContent.trim().match(/^`?([a-z_/]+)`?/);
+    if (m) _secMap[m[1].split('/')[0]] = h;   // "taken/not_taken" → "taken"
+    if (!h.id) {
+      h.id = 'kw-' + h.textContent.trim().toLowerCase()
+               .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    }
+  });
+  // also index h2 section headers by their leading keyword
+  document.getElementById('doc-panel').querySelectorAll('h2').forEach(h => {
     if (!h.id) {
       h.id = 'sec-' + h.textContent.trim().toLowerCase()
                .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     }
   });
+}
 
-  const list = document.getElementById('toc-list');
+function buildGrammarToc() {
+  _tocEntries = [];
+  _indexDocHeadings();
+  _renderTocList();
+}
+
+function _renderTocList() {
+  const list   = document.getElementById('toc-list');
+  const query  = (document.getElementById('toc-search')?.value || '').trim().toLowerCase();
   list.innerHTML = '';
 
-  for (const item of GRAMMAR_DICT) {
-    if (item.cat !== undefined) {
-      const cat = document.createElement('div');
-      cat.className = 'dict-cat';
-      cat.textContent = item.cat;
-      list.appendChild(cat);
-      continue;
+  // Gather entries to show
+  let entries = GRAMMAR_DICT.filter(item => {
+    if (item.cat !== undefined) return false;   // headers handled separately
+    if (_tocFilter !== 'all' && item.file !== _tocFilter) return false;
+    if (query && !item.kw.includes(query) && !item.desc.toLowerCase().includes(query)) return false;
+    return true;
+  });
+
+  if (_tocSortAZ) {
+    // A–Z flat list — no category headers
+    entries.sort((a, b) => a.kw.localeCompare(b.kw));
+    entries.forEach(item => list.appendChild(_makeEntry(item)));
+  } else {
+    // Context order — emit category headers, respecting active filter
+    let lastCat = null;
+    for (const item of GRAMMAR_DICT) {
+      if (item.cat !== undefined) {
+        // Only show cat if its file matches filter
+        if (_tocFilter !== 'all' && item.file !== _tocFilter) { lastCat = null; continue; }
+        lastCat = item;
+        continue;
+      }
+      if (_tocFilter !== 'all' && item.file !== _tocFilter) continue;
+      if (query && !item.kw.includes(query) && !item.desc.toLowerCase().includes(query)) continue;
+      // Emit pending category header
+      if (lastCat) {
+        const cat = document.createElement('div');
+        cat.className = 'dict-cat';
+        cat.textContent = lastCat.cat;
+        list.appendChild(cat);
+        lastCat = null;
+      }
+      list.appendChild(_makeEntry(item));
     }
-
-    const row = document.createElement('div');
-    row.className = 'dict-entry';
-    row.dataset.kw  = item.kw;
-    row.dataset.sec = item.sec || '';
-    row.innerHTML =
-      `<span class="dict-kw">${item.kw}</span>` +
-      `<span class="dict-desc">${item.desc}</span>`;
-
-    row.onclick = () => {
-      const target = _secMap[item.sec];
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      list.querySelectorAll('.dict-entry.active').forEach(e => e.classList.remove('active'));
-      row.classList.add('active');
-    };
-
-    list.appendChild(row);
   }
 }
 
+function _makeEntry(item) {
+  const row = document.createElement('div');
+  row.className = 'dict-entry';
+  row.dataset.kw   = item.kw;
+  row.dataset.file = item.file || '';
+  row.innerHTML =
+    `<span class="dict-kw">${item.kw}</span>` +
+    `<span class="dict-desc">${item.desc}</span>`;
+  row.onclick = () => {
+    // Scroll to matching heading in doc panel
+    const target = _secMap[item.kw] || _secMap[item.kw.replace('_','/')];
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('toc-list').querySelectorAll('.dict-entry.active')
+      .forEach(e => e.classList.remove('active'));
+    row.classList.add('active');
+  };
+  return row;
+}
+
+function setTocFilter(f) {
+  // Clicking the active filter deselects it → back to 'all'
+  _tocFilter = (_tocFilter === f) ? 'all' : f;
+  document.querySelectorAll('.toc-filter-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.filter === _tocFilter));
+  _renderTocList();
+}
+
+function toggleTocSort() {
+  _tocSortAZ = !_tocSortAZ;
+  const btn = document.getElementById('toc-sort-btn');
+  btn.classList.toggle('active', _tocSortAZ);
+  btn.title = _tocSortAZ ? 'Sort by context' : 'Sort A–Z';
+  _renderTocList();
+}
+
 function filterToc(query) {
-  const q = query.trim().toLowerCase();
-  const list = document.getElementById('toc-list');
-  list.querySelectorAll('.dict-entry').forEach(row => {
-    const matches = !q || row.dataset.kw.includes(q) ||
-                    row.querySelector('.dict-desc').textContent.toLowerCase().includes(q);
-    row.classList.toggle('dict-hidden', !matches);
-  });
-  // Hide category headers whose every sibling entry is filtered out
-  list.querySelectorAll('.dict-cat').forEach(cat => {
-    let sib = cat.nextElementSibling;
-    let anyVisible = false;
-    while (sib && !sib.classList.contains('dict-cat')) {
-      if (!sib.classList.contains('dict-hidden')) { anyVisible = true; break; }
-      sib = sib.nextElementSibling;
-    }
-    cat.style.display = anyVisible ? '' : 'none';
-  });
+  _renderTocList();
 }
 
 // ── Panel switching ────────────────────────────────────────────────────────
 const ABOUT_MD = `# About FLOW SDK Playground
-**FLOW** — CPU ISA-agnostic constrained-random instruction stream generator.
+
+**FLOW** — *Framework for Instruction Orchestration & Workflows*
+
+A CPU ISA-agnostic, constrained-random instruction stream generator for CPU verification, simulation, and performance analysis.
+
+## Three roles
 
 | Role | Artifact | Writes |
 |------|----------|--------|
-| ISA plugin author | \`my_isa.so\` | C++ subclass of \`IISAPlugin\` |
-| Test architect | \`<name>.rules\` | Legality envelope |
-| Test script writer | \`<name>.flow\` | Directed / random sequences |
+| ISA plugin author | \`my_isa.so\` / \`my_isa.a\` | C++ subclass of \`IISAPlugin\` |
+| Test architect | \`<name>.rules\` | Legality envelope: reserved registers, mix rules, locked constraints |
+| Test script writer | \`<name>.flow\` | Test intent: directed sequences, constrained-random draws, loops, scenes |
 
 ## Running
 \`\`\`bash
-flow --plugin toy.so  my_script.flow
-flow_validate         my_script.flow
+flow --plugin toy.so  my_script.flow   # generate instruction stream
+flow_validate         my_script.flow   # validate script syntax
 \`\`\`
-*Built by Phaneendra Paluri — virtual prototyping engineer.*
+
+## Licensing
+
+| Path | Licence |
+|------|---------|
+| \`include/flow/isa/\`, \`sdk/\` | **MIT** — plugin authors are free to use, modify, distribute |
+| \`src/\`, \`tools/\` | **Proprietary** — engine source is not publicly distributed |
+
+## Developer
+
+Built by **Phaneendra Paluri** — virtual prototyping engineer (processor & SoC models in C++, SystemC/TLM2).
+
+The design is documented in a [blog series](https://phaneendra-paluri-dev.onrender.com/blogs/teaching-grammar-to-generate-instructions-introducing-flow) covering motivation, grammar design, the plugin contract, constrained-random generation, and structural constructs.
 `;
 let grammarMd = null;
 
@@ -1236,8 +1323,13 @@ function switchPanel(panel) {
     tocEl.classList.add('visible');
   } else {
     tocEl.classList.remove('visible');
-    // Reset search when leaving
+    // Reset search + filter when leaving
     document.getElementById('toc-search').value = '';
+    _tocFilter  = 'all';
+    _tocSortAZ  = false;
+    document.querySelectorAll('.toc-filter-btn').forEach(b =>
+      b.classList.remove('active'));
+    document.getElementById('toc-sort-btn')?.classList.remove('active');
     filterToc('');
   }
 
