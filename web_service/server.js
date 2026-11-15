@@ -594,6 +594,20 @@ app.post('/api/run', (req, res) => {
     proc.on('error', e => { sseMsg(res, 'stderr', `Error: ${e.message}\n`); sseDone(res, -1); });
     proc.on('close', code => {
         try { fs.unlinkSync(tmp); } catch {}
+        // Stream any generated output files (.asm, .s, .txt) with the same stem
+        const stem = path.basename(tmp, '.flow');
+        try {
+            const outFiles = fs.readdirSync(cwd)
+                .filter(f => f.startsWith(stem) && f !== path.basename(tmp))
+                .sort();
+            for (const f of outFiles) {
+                try {
+                    const content = fs.readFileSync(path.join(cwd, f), 'utf8');
+                    sseMsg(res, 'info', `\n── ${f} ──\n`);
+                    sseMsg(res, 'stdout', content);
+                } catch {}
+            }
+        } catch {}
         sseMsg(res, code === 0 ? 'info' : 'stderr', `\n[Exited with code ${code}]\n`);
         sseDone(res, code);
     });

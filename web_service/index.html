@@ -1129,6 +1129,8 @@ function setRunning(flag) {
 
 async function streamExec(endpoint, body) {
   clearOutput();
+  // Ensure output panel is open before streaming
+  if (!S.outputOpen) toggleOutput();
   setRunning(true);
   const ctrl = new AbortController();
   S.currentProc = ctrl;
@@ -1156,7 +1158,8 @@ async function streamExec(endpoint, body) {
         try {
           const msg = JSON.parse(part.slice(6));
           if (msg.type === 'exit') {
-            appendOutput('info', '', msg.code === 0);  // empty line acts as spacing
+            // exit code is already printed by the server as [Exited with code N]
+            // nothing extra needed here
           } else {
             appendOutput(msg.type, msg.text || '');
           }
@@ -1170,6 +1173,8 @@ async function streamExec(endpoint, body) {
     setRunning(false);
     S.currentProc = null;
     updateRunBtns();
+    // Refresh tree so generated output files (.asm etc.) appear in Explorer
+    loadTree();
   }
 }
 
