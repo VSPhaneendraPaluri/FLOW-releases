@@ -551,42 +551,38 @@ function scriptBaseName(scriptPath, content) {
 
 function writeTempScript(content, scriptPath, _prefix) {
     const base = scriptBaseName(scriptPath, content);
+    // Short random suffix keeps names collision-free across concurrent runs
+    // while staying human-readable:  smoke_a3f.flow → smoke_a3f.smoke_alu.asm
+    const uid  = Math.random().toString(36).slice(2, 5);
+    const name = `${base}_${uid}.flow`;
 
-    // Each run gets its own subdirectory so output files from concurrent runs
-    // don't collide and cleanup is straightforward (remove the whole dir).
-    // The temp script is named <base>.flow so the binary produces:
-    //   <base>.<testname>.asm  (e.g. smoke.smoke_alu.asm)
+    // IMPORTANT: the temp script must live in the SAME directory as the .rules
+    // file it references so that relative `use "foo.rules"` paths resolve.
 
-    // 1. Prefer adjacent to the original SDK file (scriptPath provided by client)
+    // 1. Prefer adjacent to the original SDK file (scriptPath from client)
     if (scriptPath && SDK_ROOT) {
         const dir = path.join(SDK_ROOT, path.dirname(scriptPath));
         if (fs.existsSync(dir)) {
-            const runDir = path.join(dir, `_run_${Date.now()}`);
-            fs.mkdirSync(runDir, { recursive: true });
-            const tmp = path.join(runDir, `${base}.flow`);
+            const tmp = path.join(dir, name);
             fs.writeFileSync(tmp, content, 'utf8');
             return tmp;
         }
     }
-    // 2. Script uses a relative rules file — find it in the SDK and write next to it
+    // 2. Script references a relative .rules file — find it in the SDK
     if (SDK_ROOT) {
         const m = content.match(/use\s+"([^"]+\.rules)"/);
         if (m) {
             const rulesName = path.basename(m[1]);
             const found = findFileInSdk(SDK_ROOT, rulesName);
             if (found) {
-                const runDir = path.join(path.dirname(found), `_run_${Date.now()}`);
-                fs.mkdirSync(runDir, { recursive: true });
-                const tmp = path.join(runDir, `${base}.flow`);
+                const tmp = path.join(path.dirname(found), name);
                 fs.writeFileSync(tmp, content, 'utf8');
                 return tmp;
             }
         }
     }
-    // 3. Fallback: system temp dir
-    const runDir = path.join(os.tmpdir(), `_flow_run_${Date.now()}`);
-    fs.mkdirSync(runDir, { recursive: true });
-    const tmp = path.join(runDir, `${base}.flow`);
+    // 3. Fallback: system temp dir (absolute path, no relative rules resolution)
+    const tmp = path.join(os.tmpdir(), name);
     fs.writeFileSync(tmp, content, 'utf8');
     return tmp;
 }
@@ -619,11 +615,11 @@ app.post('/api/run', (req, res) => {
     proc.stderr.on('data', d => sseMsg(res, 'stderr', d.toString()));
     proc.on('error', e => { sseMsg(res, 'stderr', `Error: ${e.message}\n`); sseDone(res, -1); });
     proc.on('close', code => {
-        // Stream any generated output files (.asm, .s, .txt) before cleanup
-        const stem = path.basename(tmp, '.flow');
+        // Stream generated output files (.asm, .s, .txt) that share the temp stem
+        const stem = path.basename(tmp, '.flow');   // e.g. "smoke_a3f"
         try {
             const outFiles = fs.readdirSync(cwd)
-                .filter(f => f !== path.basename(tmp))   // skip the input script itself
+                .filter(f => f.startsWith(stem) && f !== path.basename(tmp))
                 .sort();
             for (const f of outFiles) {
                 try {
@@ -632,9 +628,13 @@ app.post('/api/run', (req, res) => {
                     sseMsg(res, 'stdout', content);
                 } catch {}
             }
-        } catch {}
-        // Remove the entire run directory (temp script + all outputs)
-        try { fs.rmSync(cwd, { recursive: true, force: true }); } catch {}
+            // Clean up: remove temp script and its outputs (leave other SDK files alone)
+            for (const f of [path.basename(tmp), ...outFiles]) {
+                try { fs.unlinkSync(path.join(cwd, f)); } catch {}
+            }
+        } catch {
+            try { fs.unlinkSync(tmp); } catch {}
+        }
         sseMsg(res, code === 0 ? 'info' : 'stderr', `\n[Exited with code ${code}]\n`);
         sseDone(res, code);
     });
