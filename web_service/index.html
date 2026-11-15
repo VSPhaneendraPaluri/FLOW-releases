@@ -787,7 +787,11 @@ function registerFlowLanguage() {
   });
   monaco.languages.register({ id: 'flowrules' });
   monaco.languages.setMonarchTokensProvider('flowrules', flowTokens);
-  monaco.languages.setLanguageConfiguration('flowrules', flowTokens.brackets ? undefined : undefined);
+  monaco.languages.setLanguageConfiguration('flowrules', {
+    comments: { lineComment: '#' },
+    brackets: [['{','}'],['(',')'],['[',']']],
+    autoClosingPairs: [{open:'{',close:'}'},{open:'(',close:')'},{open:'[',close:']'},{open:'"',close:'"'}],
+  });
 }
 
 // ── Status / server info ───────────────────────────────────────────────────
