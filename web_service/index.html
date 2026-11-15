@@ -4,8 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FLOW SDK Playground</title>
+<!-- marked must load BEFORE Monaco's AMD loader: Monaco's loader.js defines a
+     global `define` with `define.amd` set, and marked's UMD wrapper checks
+     for AMD first — if it sees one, it registers as an anonymous AMD module
+     instead of setting `window.marked`, and nothing ever requires it back. -->
+<script src="/vendor/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -221,26 +225,20 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
   white-space: nowrap; text-align: center;
 }
 .toc-filter-btn:hover { background: var(--bg-hover); color: var(--fg-primary); }
-.toc-filter-btn.active { background: #1a3a52; border-color: var(--accent); color: var(--fg-primary); }
+.toc-filter-btn.active {
+  background: #1a3a52; border-color: var(--accent); color: var(--fg-primary);
+}
 .toc-sort-btn {
   padding: 3px 7px; font-size: 10px; font-family: var(--font-mono);
   background: #2d2d2d; border: 1px solid var(--border);
   color: var(--fg-secondary); border-radius: 3px; cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+  white-space: nowrap;
 }
 .toc-sort-btn:hover { background: var(--bg-hover); color: var(--fg-primary); }
-.toc-sort-btn.active { background: #2a1a52; border-color: #9b59b6; color: #c39bd3; }
-
-.dict-entry {
-  padding: 4px 10px; cursor: pointer; border-radius: 2px;
+.toc-sort-btn.active {
+  background: #2a1a52; border-color: #9b59b6; color: #c39bd3;
 }
-.dict-entry:hover { background: var(--bg-hover); }
-.dict-entry.active { background: var(--bg-selected); }
-.dict-cat {
-  padding: 8px 10px 2px; font-size: 9px; font-weight: 700;
-  letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
-}
-.dict-kw { font-size: 12px; font-family: var(--font-mono); color: var(--fg-primary); }
-.dict-desc { font-size: 10.5px; color: var(--fg-secondary); line-height: 1.4; margin-top: 1px; }
 
 /* ── About panel ─────────────────────────────────────────────────────────── */
 #about-panel {
@@ -309,6 +307,18 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
 #toc-list::-webkit-scrollbar { width: 6px; }
 #toc-list::-webkit-scrollbar-thumb { background: #424242; border-radius: 3px; }
 
+.dict-cat { padding: 8px 10px 3px; font-size: 10px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--fg-secondary); }
+.dict-entry { display: flex; flex-direction: column; padding: 4px 10px 4px 14px;
+  cursor: pointer; border-radius: 2px; gap: 1px; }
+.dict-entry:hover { background: var(--bg-hover); }
+.dict-entry.active { background: var(--bg-selected); }
+.dict-entry.dict-hidden { display: none; }
+.dict-kw { font-family: var(--font-mono); font-size: 12px; color: #9cdcfe;
+  font-weight: 600; line-height: 1.3; }
+.dict-desc { font-size: 11px; color: var(--fg-secondary); line-height: 1.3;
+  white-space: normal; }
+/* legacy — kept so old references don't break */
 .toc-item {
   display: flex;
   align-items: center;
@@ -514,7 +524,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
     <!-- Activity bar -->
     <div id="actbar">
       <button class="act-btn active" id="btn-explorer" data-tip="Explorer"     onclick="switchPanel('explorer')">📁</button>
-      <button class="act-btn"        id="btn-docs"      data-tip="Grammar Ref" onclick="switchPanel('docs')">📖</button>
+      <button class="act-btn"        id="btn-docs"      data-tip="Grammar Dictionary" onclick="switchPanel('docs')">📖</button>
       <button class="act-btn"        id="btn-scratch"   data-tip="New Scratchpad (.flow)" onclick="newScratchpad()">✏️</button>
       <button class="act-btn"        id="btn-about"     data-tip="About FLOW"  onclick="switchPanel('about')">ℹ️</button>
     </div>
@@ -532,19 +542,21 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
           <input id="toc-search" type="search" placeholder="Filter keywords…" oninput="filterToc(this.value)" />
         </div>
         <div id="toc-filter-row">
-          <button class="toc-filter-btn" data-filter="rules" onclick="setTocFilter('rules')">.rules</button>
-          <button class="toc-filter-btn" data-filter="flow"  onclick="setTocFilter('flow')">.flow</button>
-          <button class="toc-sort-btn"   id="toc-sort-btn"   onclick="toggleTocSort()" title="Sort A–Z">A–Z</button>
+          <button class="toc-filter-btn"  data-filter="rules"  onclick="setTocFilter('rules')">.rules</button>
+          <button class="toc-filter-btn"  data-filter="flow"   onclick="setTocFilter('flow')">.flow</button>
+          <button class="toc-sort-btn"    id="toc-sort-btn"    onclick="toggleTocSort()" title="Sort A–Z">A–Z</button>
         </div>
         <div id="toc-list"></div>
       </div>
 
-      <!-- About panel -->
+      <!-- About panel (shown instead of file-tree when about is active) -->
       <div id="about-panel">
         <div class="about-logo">⚡</div>
         <div class="about-title">FLOW SDK Playground</div>
         <div class="about-tagline">Framework for Instruction Orchestration &amp; Workflows</div>
-        <div class="about-desc">A CPU ISA-agnostic, constrained-random instruction stream generator for CPU verification, simulation, and performance analysis.</div>
+        <div class="about-desc">
+          A CPU ISA-agnostic, constrained-random instruction stream generator for CPU verification, simulation, and performance analysis.
+        </div>
 
         <div class="about-section">
           <div class="about-section-title">Three Roles</div>
@@ -614,10 +626,9 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
 
         <div class="about-section">
           <div class="about-section-title">API Version</div>
-          <div class="about-desc" style="margin:0;font-size:10.5px">
-            Plugin boundary packed as <code style="font-family:var(--font-mono);font-size:10px;background:#2d2d2d;padding:1px 5px;border-radius:3px;border:1px solid var(--border)">[major:16][minor:8][patch:8]</code>.<br>
-            Major mismatch → plugin rejected at load.<br>
-            Constant: <code style="font-family:var(--font-mono);font-size:10px;background:#2d2d2d;padding:1px 5px;border-radius:3px;border:1px solid var(--border)">FLOW_ISA_API_VERSION</code>
+          <div class="about-desc" style="margin:0">
+            Plugin boundary: <code style="font-family:var(--font-mono);font-size:10px;background:#2d2d2d;padding:1px 5px;border-radius:3px;border:1px solid var(--border)">[major:16][minor:8][patch:8]</code><br>
+            Major mismatch → plugin rejected at load. Constant: <code style="font-family:var(--font-mono);font-size:10px;background:#2d2d2d;padding:1px 5px;border-radius:3px;border:1px solid var(--border)">FLOW_ISA_API_VERSION</code>
           </div>
         </div>
 
@@ -1226,130 +1237,166 @@ function newScratchpad() {
   setTimeout(() => S.editor?.focus(), 100);
 }
 
-// ── Grammar TOC ────────────────────────────────────────────────────────────
 // ── Grammar Dictionary ─────────────────────────────────────────────────────
+// Static curated keyword dictionary — groups FLOW keywords by semantic
+// category with one-line descriptions. Clicking a keyword scrolls the
+// rendered doc-panel to the matching section heading.
+
 const GRAMMAR_DICT = [
+  // ── .rules file ──────────────────────────────────────────────────────────
   { cat: '.rules — ISA & pools', file: 'rules' },
-  { kw: 'isa',        desc: 'Name the ISA plugin this file targets',                        file: 'rules' },
-  { kw: 'pool',       desc: 'Declare a named reg / addr / imm / instr pool with weights',   file: 'rules' },
-  { kw: 'reserve',    desc: 'Permanently remove registers from all random draws',           file: 'rules' },
+  { kw: 'isa',       desc: 'Name the ISA plugin this file targets',                       file: 'rules' },
+  { kw: 'pool',      desc: 'Declare a named reg / addr / imm / instr pool with weights',  file: 'rules' },
+  { kw: 'reserve',   desc: 'Permanently remove registers from all random draws',          file: 'rules' },
+
   { cat: '.rules — Constraints', file: 'rules' },
-  { kw: 'forbid',     desc: 'Prohibit an instruction pattern; optionally lock it',          file: 'rules' },
-  { kw: 'require',    desc: 'Mandate a condition on a generated instruction',               file: 'rules' },
-  { kw: 'when',       desc: 'Guard a forbid/require rule — evaluated at draw time',         file: 'rules' },
-  { kw: 'as',         desc: 'Name a rule so it can be referenced by relax / override',      file: 'rules' },
-  { kw: 'lock',       desc: 'Make a forbid/require rule unbreakable by any test',           file: 'rules' },
-  { kw: 'for',        desc: 'Identify which operand a require condition applies to',        file: 'rules' },
-  { kw: 'in',         desc: 'Pool-membership guard: when instr in <pool>',                  file: 'rules' },
-  { kw: 'group',      desc: 'Bundle named rules so a test can relax them together',         file: 'rules' },
+  { kw: 'forbid',    desc: 'Prohibit an instruction pattern; optionally lock it',         file: 'rules' },
+  { kw: 'require',   desc: 'Mandate a condition on a generated instruction',              file: 'rules' },
+  { kw: 'when',      desc: 'Guard a forbid/require rule — evaluated at draw time',        file: 'rules' },
+  { kw: 'as',        desc: 'Name a rule so it can be referenced by relax / override',     file: 'rules' },
+  { kw: 'lock',      desc: 'Make a forbid/require rule unbreakable by any test',          file: 'rules' },
+  { kw: 'for',       desc: 'Identify which operand a require condition applies to',       file: 'rules' },
+  { kw: 'in',        desc: 'Pool-membership guard: when instr in <pool>',                 file: 'rules' },
+  { kw: 'group',     desc: 'Bundle named rules so a test can relax them together',        file: 'rules' },
+
+  // ── .flow file ───────────────────────────────────────────────────────────
   { cat: '.flow — File level', file: 'flow' },
-  { kw: 'use',        desc: 'Import pools, scenes and rules from a .rules or .flow file',   file: 'flow' },
-  { kw: 'seed',       desc: 'Pin the RNG seed — same seed + script = identical output',     file: 'flow' },
-  { kw: 'strict',     desc: 'Promote all warnings to hard errors',                          file: 'flow' },
-  { kw: 'const',      desc: 'Declare a compile-time integer constant',                      file: 'flow' },
-  { kw: 'defaults',   desc: 'Set the default pool for each operand kind',                   file: 'flow' },
-  { kw: 'mix',        desc: 'Declare instruction-mix targets; engine steers draws to meet them', file: 'flow' },
-  { kw: 'before',     desc: 'Run a block before each test (file-level) or this test',       file: 'flow' },
-  { kw: 'after',      desc: 'Run a block after each test (file-level) or this test',        file: 'flow' },
-  { kw: 'init',       desc: 'Set memory or register state before a test runs',              file: 'flow' },
+  { kw: 'use',       desc: 'Import pools, scenes and rules from a .rules or .flow file',  file: 'flow' },
+  { kw: 'seed',      desc: 'Pin the RNG seed — same seed + script = identical output',    file: 'flow' },
+  { kw: 'strict',    desc: 'Promote all warnings to hard errors',                         file: 'flow' },
+  { kw: 'const',     desc: 'Declare a compile-time integer constant',                     file: 'flow' },
+  { kw: 'defaults',  desc: 'Set the default pool for each operand kind',                  file: 'flow' },
+  { kw: 'mix',       desc: 'Declare instruction-mix targets; engine steers draws to meet them', file: 'flow' },
+  { kw: 'before',    desc: 'Run a block before each test (file-level) or this test',      file: 'flow' },
+  { kw: 'after',     desc: 'Run a block after each test (file-level) or this test',       file: 'flow' },
+  { kw: 'init',      desc: 'Set memory or register state before a test runs',             file: 'flow' },
+
   { cat: '.flow — Structure', file: 'flow' },
-  { kw: 'scene',      desc: 'Reusable named parameterised fragment of test logic',          file: 'flow' },
-  { kw: 'test',       desc: 'Top-level unit of generation — produces one instruction stream', file: 'flow' },
+  { kw: 'scene',     desc: 'Reusable named parameterised fragment of test logic',         file: 'flow' },
+  { kw: 'test',      desc: 'Top-level unit of generation — produces one instruction stream', file: 'flow' },
+
   { cat: '.flow — Generation', file: 'flow' },
-  { kw: 'crand',      desc: 'Draw N random instructions from a pool (constrained-random)',  file: 'flow' },
-  { kw: 'until',      desc: 'Draw until a condition holds — use with max as a safety cap',  file: 'flow' },
-  { kw: 'max',        desc: 'Safety cap on an until expression — errors if hit',            file: 'flow' },
-  { kw: 'run',        desc: 'Expand a named scene inline',                                  file: 'flow' },
-  { kw: 'repeat',     desc: 'Execute a block N times as independent random draws',          file: 'flow' },
-  { kw: 'loop',       desc: 'Emit a counted loop with auto-generated counter/branch code',  file: 'flow' },
-  { kw: 'choose',     desc: 'Pick one weighted arm per iteration (choose one / N times)',   file: 'flow' },
-  { kw: 'interleave', desc: 'Merge child blocks, preserving per-block order',               file: 'flow' },
-  { kw: 'atomic',     desc: 'Indivisible unit inside interleave — never split by interleaver', file: 'flow' },
-  { kw: 'branch',     desc: 'Emit a branch with weighted taken / not_taken arms',           file: 'flow' },
-  { kw: 'taken',      desc: 'The branch-taken arm inside a branch block',                   file: 'flow' },
-  { kw: 'not_taken',  desc: 'The fall-through arm inside a branch block',                   file: 'flow' },
+  { kw: 'crand',     desc: 'Draw N random instructions from a pool (constrained-random)', file: 'flow' },
+  { kw: 'until',     desc: 'Draw until a condition holds — use with max as a safety cap', file: 'flow' },
+  { kw: 'max',       desc: 'Safety cap on an until expression — errors if hit',           file: 'flow' },
+  { kw: 'run',       desc: 'Expand a named scene inline',                                 file: 'flow' },
+  { kw: 'repeat',    desc: 'Execute a block N times as independent random draws',         file: 'flow' },
+  { kw: 'loop',      desc: 'Emit a counted loop with auto-generated counter/branch code', file: 'flow' },
+  { kw: 'choose',    desc: 'Pick one weighted arm per iteration (choose one / N times)',  file: 'flow' },
+  { kw: 'interleave',desc: 'Merge child blocks, preserving per-block order',              file: 'flow' },
+  { kw: 'atomic',    desc: 'Indivisible unit inside interleave — never split by interleaver', file: 'flow' },
+  { kw: 'branch',    desc: 'Emit a branch with weighted taken / not_taken arms',          file: 'flow' },
+  { kw: 'taken',     desc: 'The branch-taken arm inside a branch block',                  file: 'flow' },
+  { kw: 'not_taken', desc: 'The fall-through arm inside a branch block',                  file: 'flow' },
+
   { cat: '.flow — Overrides & checks', file: 'flow' },
-  { kw: 'with',       desc: 'Override pool bindings for the duration of a block',           file: 'flow' },
-  { kw: 'relax',      desc: 'Disable a named rule or group for this test only',             file: 'flow' },
-  { kw: 'override',   desc: 'Replace the body of a named rule for this test only',          file: 'flow' },
-  { kw: 'check',      desc: 'Assert a register or memory value against the arch model',     file: 'flow' },
-  { kw: 'expect',     desc: 'Declare that enclosed instructions should raise a fault',      file: 'flow' },
-  { kw: 'fault',      desc: 'Names the expected fault kind inside an expect block',         file: 'flow' },
-  { kw: 'label',      desc: 'Define a jump target within a test or scene',                  file: 'flow' },
-  { kw: 'goto',       desc: 'Jump unconditionally to a label',                              file: 'flow' },
-  { kw: 'report',     desc: 'Print mix or rule results at end of test (mix / rules)',       file: 'flow' },
+  { kw: 'with',      desc: 'Override pool bindings for the duration of a block',          file: 'flow' },
+  { kw: 'relax',     desc: 'Disable a named rule or group for this test only',            file: 'flow' },
+  { kw: 'override',  desc: 'Replace the body of a named rule for this test only',         file: 'flow' },
+  { kw: 'check',     desc: 'Assert a register or memory value against the arch model',    file: 'flow' },
+  { kw: 'expect',    desc: 'Declare that enclosed instructions should raise a fault',     file: 'flow' },
+  { kw: 'fault',     desc: 'Names the expected fault kind inside an expect block',        file: 'flow' },
+  { kw: 'label',     desc: 'Define a jump target within a test or scene',                 file: 'flow' },
+  { kw: 'goto',      desc: 'Jump unconditionally to a label',                             file: 'flow' },
+  { kw: 'report',    desc: 'Print mix or rule results at end of test (mix / rules)',      file: 'flow' },
 ];
 
-let _tocFilter = 'all';
-let _tocSortAZ = false;
-let _secMap    = {};   // keyword text → heading element in doc-panel
+// ── Grammar Dictionary state ───────────────────────────────────────────────
+let _secMap    = {};
+let _tocEntries = [];   // kept for compatibility
+let _tocFilter  = 'all';   // 'all' | 'rules' | 'flow'
+let _tocSortAZ  = false;
 
+// Index rendered headings by keyword text (### `keyword`) for scroll-to
 function _indexDocHeadings() {
   _secMap = {};
   document.getElementById('doc-panel').querySelectorAll('h3').forEach(h => {
-    _secMap[h.textContent.trim().toLowerCase()] = h;
+    // heading text like "`crand`" or "`forbid`" — extract the keyword
+    const m = h.textContent.trim().match(/^`?([a-z_/]+)`?/);
+    if (m) _secMap[m[1].split('/')[0]] = h;   // "taken/not_taken" → "taken"
+    if (!h.id) {
+      h.id = 'kw-' + h.textContent.trim().toLowerCase()
+               .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    }
+  });
+  // also index h2 section headers by their leading keyword
+  document.getElementById('doc-panel').querySelectorAll('h2').forEach(h => {
+    if (!h.id) {
+      h.id = 'sec-' + h.textContent.trim().toLowerCase()
+               .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    }
   });
 }
 
 function buildGrammarToc() {
+  _tocEntries = [];
   _indexDocHeadings();
   _renderTocList();
 }
 
 function _renderTocList() {
-  const list  = document.getElementById('toc-list');
-  const query = (document.getElementById('toc-search').value || '').trim().toLowerCase();
+  const list   = document.getElementById('toc-list');
+  const query  = (document.getElementById('toc-search')?.value || '').trim().toLowerCase();
   list.innerHTML = '';
 
-  let items = GRAMMAR_DICT;
+  // Gather entries to show
+  let entries = GRAMMAR_DICT.filter(item => {
+    if (item.cat !== undefined) return false;   // headers handled separately
+    if (_tocFilter !== 'all' && item.file !== _tocFilter) return false;
+    if (query && !item.kw.includes(query) && !item.desc.toLowerCase().includes(query)) return false;
+    return true;
+  });
 
-  // Filter by file type
-  if (_tocFilter !== 'all') {
-    items = items.filter(e => e.file === _tocFilter);
-  }
-
-  // Filter by search query
-  if (query) {
-    items = items.filter(e => e.cat ||
-      e.kw.toLowerCase().includes(query) ||
-      e.desc.toLowerCase().includes(query));
-    // Remove category headers that have no visible keyword children
-    const kwItems = items.filter(e => e.kw);
-    items = items.filter(e => {
-      if (!e.cat) return true;
-      return kwItems.some(k => k.file === e.file);
-    });
-  }
-
-  // Sort A-Z (keywords only; categories suppressed in sorted view)
   if (_tocSortAZ) {
-    items = items.filter(e => e.kw).sort((a, b) => a.kw.localeCompare(b.kw));
+    // A–Z flat list — no category headers
+    entries.sort((a, b) => a.kw.localeCompare(b.kw));
+    entries.forEach(item => list.appendChild(_makeEntry(item)));
+  } else {
+    // Context order — emit category headers, respecting active filter
+    let lastCat = null;
+    for (const item of GRAMMAR_DICT) {
+      if (item.cat !== undefined) {
+        // Only show cat if its file matches filter
+        if (_tocFilter !== 'all' && item.file !== _tocFilter) { lastCat = null; continue; }
+        lastCat = item;
+        continue;
+      }
+      if (_tocFilter !== 'all' && item.file !== _tocFilter) continue;
+      if (query && !item.kw.includes(query) && !item.desc.toLowerCase().includes(query)) continue;
+      // Emit pending category header
+      if (lastCat) {
+        const cat = document.createElement('div');
+        cat.className = 'dict-cat';
+        cat.textContent = lastCat.cat;
+        list.appendChild(cat);
+        lastCat = null;
+      }
+      list.appendChild(_makeEntry(item));
+    }
   }
-
-  items.forEach(item => list.appendChild(_makeEntry(item)));
 }
 
 function _makeEntry(item) {
-  const el = document.createElement('div');
-  if (item.cat) {
-    el.className = 'dict-cat';
-    el.textContent = item.cat;
-  } else {
-    el.className = 'dict-entry';
-    el.innerHTML = `<div class="dict-kw">${item.kw}</div><div class="dict-desc">${item.desc}</div>`;
-    el.onclick = () => {
-      const h = _secMap[item.kw.toLowerCase()];
-      if (h) {
-        h.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        document.querySelectorAll('#toc-list .dict-entry.active').forEach(e => e.classList.remove('active'));
-        el.classList.add('active');
-      }
-    };
-  }
-  return el;
+  const row = document.createElement('div');
+  row.className = 'dict-entry';
+  row.dataset.kw   = item.kw;
+  row.dataset.file = item.file || '';
+  row.innerHTML =
+    `<span class="dict-kw">${item.kw}</span>` +
+    `<span class="dict-desc">${item.desc}</span>`;
+  row.onclick = () => {
+    // Scroll to matching heading in doc panel
+    const target = _secMap[item.kw] || _secMap[item.kw.replace('_','/')];
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('toc-list').querySelectorAll('.dict-entry.active')
+      .forEach(e => e.classList.remove('active'));
+    row.classList.add('active');
+  };
+  return row;
 }
 
 function setTocFilter(f) {
+  // Clicking the active filter deselects it → back to 'all'
   _tocFilter = (_tocFilter === f) ? 'all' : f;
   document.querySelectorAll('.toc-filter-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.filter === _tocFilter));
@@ -1358,13 +1405,50 @@ function setTocFilter(f) {
 
 function toggleTocSort() {
   _tocSortAZ = !_tocSortAZ;
-  document.getElementById('toc-sort-btn').classList.toggle('active', _tocSortAZ);
+  const btn = document.getElementById('toc-sort-btn');
+  btn.classList.toggle('active', _tocSortAZ);
+  btn.title = _tocSortAZ ? 'Sort by context' : 'Sort A–Z';
   _renderTocList();
 }
 
-function filterToc(query) { _renderTocList(); }
+function filterToc(query) {
+  _renderTocList();
+}
 
 // ── Panel switching ────────────────────────────────────────────────────────
+const ABOUT_MD = `# About FLOW SDK Playground
+
+**FLOW** — *Framework for Instruction Orchestration & Workflows*
+
+A CPU ISA-agnostic, constrained-random instruction stream generator for CPU verification, simulation, and performance analysis.
+
+## Three roles
+
+| Role | Artifact | Writes |
+|------|----------|--------|
+| ISA plugin author | \`my_isa.so\` / \`my_isa.a\` | C++ subclass of \`IISAPlugin\` |
+| Test architect | \`<name>.rules\` | Legality envelope: reserved registers, mix rules, locked constraints |
+| Test script writer | \`<name>.flow\` | Test intent: directed sequences, constrained-random draws, loops, scenes |
+
+## Running
+\`\`\`bash
+flow --plugin toy.so  my_script.flow   # generate instruction stream
+flow_validate         my_script.flow   # validate script syntax
+\`\`\`
+
+## Licensing
+
+| Path | Licence |
+|------|---------|
+| \`include/flow/isa/\`, \`sdk/\` | **MIT** — plugin authors are free to use, modify, distribute |
+| \`src/\`, \`tools/\` | **Proprietary** — engine source is not publicly distributed |
+
+## Developer
+
+Built by **Phaneendra Paluri** — virtual prototyping engineer (processor & SoC models in C++, SystemC/TLM2).
+
+The design is documented in a [blog series](https://phaneendra-paluri-dev.onrender.com/blogs/teaching-grammar-to-generate-instructions-introducing-flow) covering motivation, grammar design, the plugin contract, constrained-random generation, and structural constructs.
+`;
 let grammarMd = null;
 
 function switchPanel(panel) {
@@ -1375,31 +1459,36 @@ function switchPanel(panel) {
   document.getElementById('sidebar-header').textContent =
     { explorer: 'Explorer', docs: 'Grammar Dictionary', about: 'About' }[panel] || panel;
 
-  // Show/hide sidebar panes exclusively
-  document.getElementById('file-tree').style.display  = (panel === 'explorer') ? ''     : 'none';
-  document.getElementById('about-panel').style.display = (panel === 'about')    ? 'flex' : 'none';
-  const tocEl = document.getElementById('grammar-toc');
+  // Show/hide sidebar panes: file-tree | grammar-toc | about-panel
+  const fileTree   = document.getElementById('file-tree');
+  const tocEl      = document.getElementById('grammar-toc');
+  const aboutEl    = document.getElementById('about-panel');
+
+  fileTree.style.display  = (panel === 'explorer') ? ''     : 'none';
+  aboutEl.style.display   = (panel === 'about')    ? 'flex' : 'none';
+
   if (panel === 'docs') {
     tocEl.classList.add('visible');
   } else {
     tocEl.classList.remove('visible');
     // Reset search + filter when leaving docs panel
-    document.getElementById('toc-search').value = '';
-    _tocFilter = 'all';
-    _tocSortAZ = false;
-    document.querySelectorAll('.toc-filter-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('toc-sort-btn')?.classList.remove('active');
-    filterToc('');
+    if (panel !== 'docs') {
+      document.getElementById('toc-search').value = '';
+      _tocFilter = 'all';
+      _tocSortAZ = false;
+      document.querySelectorAll('.toc-filter-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('toc-sort-btn')?.classList.remove('active');
+      filterToc('');
+    }
   }
 
-  if (panel === 'docs') loadGrammarRef();
+  if (panel === 'docs')  loadGrammarRef();
   // About renders its own HTML panel — no showStaticDoc needed
 }
 
 async function loadGrammarRef() {
   if (grammarMd) {
-    showStaticDoc(grammarMd, 'Grammar Reference');
-    buildGrammarToc();
+    showStaticDoc(grammarMd, 'Grammar Reference', /*buildToc=*/true);
     return;
   }
   try {
@@ -1407,19 +1496,16 @@ async function loadGrammarRef() {
     if (res.ok) {
       const d = await res.json();
       grammarMd = d.content;
-      showStaticDoc(grammarMd, 'Grammar Reference');
-      requestAnimationFrame(buildGrammarToc);
+      showStaticDoc(grammarMd, 'Grammar Reference', /*buildToc=*/true);
     } else {
-      showStaticDoc('> Grammar reference not found in this SDK release.', 'Grammar Reference');
-      buildGrammarToc();
+      showStaticDoc('> Grammar reference not found in this SDK release.', 'Grammar Reference', false);
     }
   } catch {
-    showStaticDoc('> Could not load grammar reference.', 'Grammar Reference');
-    buildGrammarToc();
+    showStaticDoc('> Could not load grammar reference.', 'Grammar Reference', false);
   }
 }
 
-function showStaticDoc(md, title) {
+function showStaticDoc(md, title, buildToc = false) {
   document.getElementById('welcome').style.display   = 'none';
   document.getElementById('monaco-container').style.display = 'none';
   const docPanel = document.getElementById('doc-panel');
@@ -1427,6 +1513,12 @@ function showStaticDoc(md, title) {
   docPanel.innerHTML     = marked.parse(md);
   document.getElementById('sb-path').textContent = title;
   document.getElementById('sb-lang').textContent = 'markdown';
+
+  // Build/rebuild TOC immediately after innerHTML is set (synchronous DOM)
+  if (buildToc) {
+    _tocEntries = [];   // reset so we always rebuild fresh
+    buildGrammarToc();
+  }
 }
 
 // ── Sidebar resizer ────────────────────────────────────────────────────────
