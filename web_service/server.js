@@ -408,6 +408,38 @@ app.post('/api/load-sdk', async (req, res) => {
     }
 });
 
+// ── API: upload plugin (.so / .dll / .dylib) ──────────────────────────────
+// Accepts raw binary body. Saves to sdk_runtime/plugins/<filename>.
+// Returns the rel path so the UI can add it to the plugin dropdown immediately.
+app.post('/api/upload-plugin', (req, res) => {
+    if (!SDK_ROOT) return res.status(503).json({ error: 'SDK not loaded' });
+    const name = (req.headers['x-plugin-name'] || '').replace(/[^a-zA-Z0-9._-]/g, '_');
+    if (!name) return res.status(400).json({ error: 'Missing X-Plugin-Name header' });
+    const exts = ['.so', '.dll', '.dylib'];
+    if (!exts.some(x => name.toLowerCase().endsWith(x)))
+        return res.status(400).json({ error: 'File must be .so, .dll, or .dylib' });
+
+    const pluginsDir = path.join(SDK_ROOT, 'plugins');
+    fs.mkdirSync(pluginsDir, { recursive: true });
+    const dest = path.join(pluginsDir, name);
+    const chunks = [];
+    req.on('data', c => chunks.push(c));
+    req.on('end', () => {
+        try {
+            const buf = Buffer.concat(chunks);
+            if (buf.length === 0) return res.status(400).json({ error: 'Empty file' });
+            if (buf.length > 32 * 1024 * 1024)
+                return res.status(413).json({ error: 'Plugin too large (max 32 MB)' });
+            fs.writeFileSync(dest, buf);
+            if (!isWin) { try { fs.chmodSync(dest, 0o755); } catch {} }
+            const rel = path.relative(SDK_ROOT, dest);
+            console.log(`[plugin] Uploaded: ${name} (${(buf.length / 1e3).toFixed(0)} KB)`);
+            res.json({ ok: true, name, rel });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+    req.on('error', e => res.status(500).json({ error: e.message }));
+});
+
 // ── API: tree ──────────────────────────────────────────────────────────────
 function buildTree(dir, relBase) {
     const result = [];
@@ -444,28 +476,12 @@ function resolveSafe(rel) {
     return abs;
 }
 
-// Assets bundled with the web_service for local/fallback use
-const ASSETS_DIR = path.join(__dirname, 'assets');
-
 app.get('/api/file', (req, res) => {
-    const rel = req.query.path;
-    let abs = resolveSafe(rel);
-
-    // If the SDK-rooted path doesn't exist, fall back to bundled assets/
-    if ((!abs || !fs.existsSync(abs) || fs.statSync(abs).isDirectory()) && rel) {
-        const assetAbs = path.resolve(ASSETS_DIR, rel);
-        // Safety: must still be under assets dir
-        if (assetAbs.startsWith(ASSETS_DIR + path.sep) || assetAbs === ASSETS_DIR) {
-            if (fs.existsSync(assetAbs) && !fs.statSync(assetAbs).isDirectory()) {
-                abs = assetAbs;
-            }
-        }
-    }
-
+    const abs = resolveSafe(req.query.path);
     if (!abs) return res.status(403).json({ error: 'Forbidden' });
     if (!fs.existsSync(abs) || fs.statSync(abs).isDirectory())
         return res.status(404).json({ error: 'Not found' });
-    try { res.json({ path: rel, content: fs.readFileSync(abs, 'utf8') }); }
+    try { res.json({ path: req.query.path, content: fs.readFileSync(abs, 'utf8') }); }
     catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -536,53 +552,31 @@ function findFileInSdk(dir, name) {
     return null;
 }
 
-// Derive a clean base name from the original script path so the binary's output
-// files follow the fixture naming convention: <scriptname>.<testname>.asm
-function scriptBaseName(scriptPath, content) {
-    if (scriptPath) {
-        const stem = path.basename(scriptPath, '.flow');
-        if (stem) return stem;
-    }
-    // Fall back to the first `test <name>` block in content
-    const m = content.match(/\btest\s+([A-Za-z_][A-Za-z0-9_]*)/);
-    if (m) return m[1];
-    return 'scratch';
-}
-
-function writeTempScript(content, scriptPath, _prefix) {
-    const base = scriptBaseName(scriptPath, content);
-    // Short random suffix keeps names collision-free across concurrent runs
-    // while staying human-readable:  smoke_a3f.flow → smoke_a3f.smoke_alu.asm
-    const uid  = Math.random().toString(36).slice(2, 5);
-    const name = `${base}_${uid}.flow`;
-
-    // IMPORTANT: the temp script must live in the SAME directory as the .rules
-    // file it references so that relative `use "foo.rules"` paths resolve.
-
-    // 1. Prefer adjacent to the original SDK file (scriptPath from client)
+function writeTempScript(content, scriptPath, prefix) {
+    // 1. Prefer adjacent to the original SDK file (scriptPath provided by client)
     if (scriptPath && SDK_ROOT) {
         const dir = path.join(SDK_ROOT, path.dirname(scriptPath));
         if (fs.existsSync(dir)) {
-            const tmp = path.join(dir, name);
+            const tmp = path.join(dir, `${prefix}_${Date.now()}.flow`);
             fs.writeFileSync(tmp, content, 'utf8');
             return tmp;
         }
     }
-    // 2. Script references a relative .rules file — find it in the SDK
+    // 2. Script uses a relative rules file — find it in the SDK and write next to it
     if (SDK_ROOT) {
         const m = content.match(/use\s+"([^"]+\.rules)"/);
         if (m) {
             const rulesName = path.basename(m[1]);
             const found = findFileInSdk(SDK_ROOT, rulesName);
             if (found) {
-                const tmp = path.join(path.dirname(found), name);
+                const tmp = path.join(path.dirname(found), `${prefix}_${Date.now()}.flow`);
                 fs.writeFileSync(tmp, content, 'utf8');
                 return tmp;
             }
         }
     }
-    // 3. Fallback: system temp dir (absolute path, no relative rules resolution)
-    const tmp = path.join(os.tmpdir(), name);
+    // 3. Fallback: /tmp (absolute path passed to binary)
+    const tmp = path.join(os.tmpdir(), `${prefix}_${Date.now()}.flow`);
     fs.writeFileSync(tmp, content, 'utf8');
     return tmp;
 }
@@ -615,26 +609,7 @@ app.post('/api/run', (req, res) => {
     proc.stderr.on('data', d => sseMsg(res, 'stderr', d.toString()));
     proc.on('error', e => { sseMsg(res, 'stderr', `Error: ${e.message}\n`); sseDone(res, -1); });
     proc.on('close', code => {
-        // Stream generated output files (.asm, .s, .txt) that share the temp stem
-        const stem = path.basename(tmp, '.flow');   // e.g. "smoke_a3f"
-        try {
-            const outFiles = fs.readdirSync(cwd)
-                .filter(f => f.startsWith(stem) && f !== path.basename(tmp))
-                .sort();
-            for (const f of outFiles) {
-                try {
-                    const content = fs.readFileSync(path.join(cwd, f), 'utf8');
-                    sseMsg(res, 'info', `\n── ${f} ──\n`);
-                    sseMsg(res, 'stdout', content);
-                } catch {}
-            }
-            // Clean up: remove temp script and its outputs (leave other SDK files alone)
-            for (const f of [path.basename(tmp), ...outFiles]) {
-                try { fs.unlinkSync(path.join(cwd, f)); } catch {}
-            }
-        } catch {
-            try { fs.unlinkSync(tmp); } catch {}
-        }
+        try { fs.unlinkSync(tmp); } catch {}
         sseMsg(res, code === 0 ? 'info' : 'stderr', `\n[Exited with code ${code}]\n`);
         sseDone(res, code);
     });
@@ -669,16 +644,8 @@ app.post('/api/validate', (req, res) => {
 });
 
 // ── Static ─────────────────────────────────────────────────────────────────
-// Expose marked.min.js — prefer node_modules (after npm install), fall back
-// to the vendored copy in assets/vendor/ for local dev without npm install.
-app.use('/vendor/marked.min.js', (_req, res) => {
-    const fromNpm    = path.join(__dirname, 'node_modules', 'marked', 'marked.min.js');
-    const fromAssets = path.join(__dirname, 'assets', 'vendor', 'marked.min.js');
-    const target = fs.existsSync(fromNpm) ? fromNpm : fromAssets;
-    res.sendFile(target);
-});
 app.use(express.static(__dirname));
-app.get('*', (_req, res) =>
+app.get(/.*/, (_req, res) =>
     res.sendFile(path.join(__dirname, 'index.html')));
 
 // ── Graceful shutdown (SIGTERM from Render on deploy / scale-down) ─────────

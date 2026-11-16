@@ -416,6 +416,12 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
 #welcome h2 { font-size: 20px; color: var(--fg-primary); font-weight: 400; }
 #welcome p  { font-size: 13px; max-width: 400px; text-align: center; line-height: 1.6; }
 #welcome .hint { margin-top: 20px; background: #2d2d2d; border: 1px solid var(--border); border-radius: 6px; padding: 12px 20px; font-size: 12px; font-family: var(--font-mono); }
+.welcome-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+.welcome-btn { background: #2d2d2d; color: var(--fg-primary); border: 1px solid var(--border); border-radius: 5px; padding: 7px 16px; font-size: 13px; cursor: pointer; }
+.welcome-btn:hover { background: #3a3a3a; border-color: #555; }
+.welcome-btn.primary { background: var(--btn-run); border-color: var(--btn-run); color: #fff; }
+.welcome-btn.primary:hover { background: var(--btn-run-h); }
+#btn-upload-plugin { font-size: 11px; padding: 2px 7px; margin-left: 2px; }
 
 /* ── Output panel ── */
 #output-panel {
@@ -488,9 +494,14 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
     <button id="btn-dismiss-banner" title="Dismiss" onclick="dismissBanner()">✕</button>
   </div>
 
+  <!-- Hidden file inputs -->
+  <input type="file" id="open-flow-input"   accept=".flow,.rules" style="display:none" onchange="openLocalFlow(this)">
+  <input type="file" id="upload-plugin-input" accept=".so,.dll,.dylib" style="display:none" onchange="uploadLocalPlugin(this)">
+
   <!-- Toolbar -->
   <div id="toolbar">
-    <button class="tb-btn" id="btn-save" onclick="saveCurrentFile()" title="Save (Ctrl+S)" disabled>💾 Save</button>
+    <button class="tb-btn" id="btn-open"   onclick="document.getElementById('open-flow-input').click()" title="Open .flow or .rules file from your computer">📂 Open</button>
+    <button class="tb-btn" id="btn-save"   onclick="saveCurrentFile()" title="Save (Ctrl+S)" disabled>💾 Save</button>
     <div class="tb-sep"></div>
 
     <div id="plugin-wrap">
@@ -498,6 +509,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
       <select id="plugin-select">
         <option value="">— none —</option>
       </select>
+      <button class="tb-btn" id="btn-upload-plugin" onclick="document.getElementById('upload-plugin-input').click()" title="Upload your own plugin (.so / .dll)">🔌 Upload</button>
     </div>
     <div class="tb-sep"></div>
 
@@ -640,10 +652,18 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
         <div id="welcome">
           <div class="logo">⚡</div>
           <h2>FLOW SDK Playground</h2>
-          <p>Browse SDK headers, documentation, and examples.<br>
-             Click any file to open and edit it.<br>
-             Use ✏️ to write a new <code>.flow</code> script and run it.</p>
+          <p>Write and run <code>.flow</code> instruction stream scripts against an ISA plugin.</p>
+          <div class="welcome-actions">
+            <button class="welcome-btn primary" onclick="openExampleFlow()">🧪 Open example</button>
+            <button class="welcome-btn" onclick="newScratchpad()">✏️ New scratchpad</button>
+            <button class="welcome-btn" onclick="document.getElementById('open-flow-input').click()">📂 Open .flow file</button>
+          </div>
           <div class="hint">flow --plugin toy.so  my_script.flow</div>
+          <p style="font-size:11px;color:var(--fg-secondary);margin-top:12px;line-height:1.7">
+            <strong style="color:var(--fg-primary)">Step 1:</strong> Select or upload a plugin (🔌 Upload in toolbar)<br>
+            <strong style="color:var(--fg-primary)">Step 2:</strong> Open or write a <code>.flow</code> script<br>
+            <strong style="color:var(--fg-primary)">Step 3:</strong> Press ▶ Run
+          </p>
         </div>
       </div>
 
@@ -657,7 +677,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
           </div>
         </div>
         <div id="output-body">
-          <span class="out-line out-info">Ready. Open a .flow script and press ▶ Run.</span>
+          <span class="out-line out-info">Ready. Select a plugin, open a .flow script, then press ▶ Run.</span>
         </div>
       </div>
     </div>
@@ -934,6 +954,87 @@ async function loadPlugins() {
   } catch (e) { console.warn('Plugin fetch failed', e); }
 }
 
+// ── Local file open (.flow / .rules from disk) ─────────────────────────────
+function openLocalFlow(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';   // reset so same file can be re-opened
+  const reader = new FileReader();
+  reader.onload = e => {
+    const content = e.target.result;
+    // Check for duplicate tab by name
+    const existing = S.tabs.find(t => t.label === file.name);
+    if (existing) { activateTab(existing.id); return; }
+    const tab = { id: genId(), label: file.name, path: null,
+                  lang: detectLang(file.name), content,
+                  savedContent: content, dirty: false, local: true };
+    S.tabs.push(tab);
+    renderTabs();
+    activateTab(tab.id);
+  };
+  reader.onerror = () => alert('Could not read file: ' + file.name);
+  reader.readAsText(file);
+}
+
+// ── Upload local plugin (.so / .dll / .dylib) ──────────────────────────────
+async function uploadLocalPlugin(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  try {
+    appendOutput('info', `[Uploading plugin: ${file.name}…]\n`);
+    const res = await fetch('/api/upload-plugin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream',
+                 'X-Plugin-Name': encodeURIComponent(file.name) },
+      body: file
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      appendOutput('error', `[Plugin upload failed] ${data.error || res.statusText}\n`);
+      return;
+    }
+    appendOutput('info', `[Plugin uploaded: ${data.name}]\n`);
+    // Refresh plugin list then auto-select the uploaded plugin
+    await loadPlugins();
+    const sel = document.getElementById('plugin-select');
+    for (const opt of sel.options) {
+      if (opt.textContent === data.name || opt.value === data.rel) {
+        sel.value = opt.value;
+        break;
+      }
+    }
+  } catch (e) {
+    appendOutput('error', `[Plugin upload error] ${e.message}\n`);
+  }
+}
+
+// ── Open first example .flow from SDK tree ─────────────────────────────────
+function openExampleFlow() {
+  // Walk the SDK file tree to find the first .flow file
+  function findFlow(nodes) {
+    for (const n of nodes || []) {
+      if (!n.children && n.name && n.name.endsWith('.flow')) return n;
+      const found = findFlow(n.children);
+      if (found) return found;
+    }
+    return null;
+  }
+  const node = findFlow(S.tree);
+  if (node) {
+    openFile(node.path, node.name);
+  } else {
+    // No SDK loaded yet — open a blank scratchpad with a starter template
+    newScratchpad();
+    const tab = S.tabs.find(t => t.id === S.activeTab);
+    if (tab) {
+      tab.content = '// FLOW example script\n// Select a plugin above, then press ▶ Run\n\nscene main {\n  random 10;\n}\n';
+      tab.savedContent = tab.content;
+      if (S.editor) S.editor.setValue(tab.content);
+    }
+  }
+}
+
 // ── Open file ──────────────────────────────────────────────────────────────
 const _openingPaths = new Set();  // guard against double-open on rapid clicks
 
@@ -1173,6 +1274,10 @@ function runScript() {
   const content = getScriptContent();
   if (!content) return;
   const pluginPath = document.getElementById('plugin-select').value;
+  if (!pluginPath) {
+    appendOutput('error', '[Error] No plugin selected. Choose a plugin from the Plugin dropdown\nor upload one with the 🔌 Upload button in the toolbar.\n');
+    return;
+  }
   const tab = S.tabs.find(t => t.id === S.activeTab);
   const scriptPath = tab?.path ?? null;   // relative SDK path → server derives stem
   streamExec('/api/run', { script: content, pluginPath, scriptPath });
