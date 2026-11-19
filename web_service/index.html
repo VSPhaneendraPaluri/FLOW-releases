@@ -1486,11 +1486,26 @@ function _makeEntry(item) {
     el.className = 'dict-entry';
     el.innerHTML = `<div class="dict-kw">${item.kw}</div><div class="dict-desc">${item.desc}</div>`;
     el.onclick = () => {
+      // Mark active immediately
+      document.querySelectorAll('#toc-list .dict-entry.active').forEach(e => e.classList.remove('active'));
+      el.classList.add('active');
+
+      // Ensure the doc-panel is visible (it may be hidden when a code tab is active)
+      const docPanel = document.getElementById('doc-panel');
+      if (docPanel.style.display === 'none' || docPanel.style.display === '') {
+        document.getElementById('welcome').style.display = 'none';
+        document.getElementById('monaco-container').style.display = 'none';
+        docPanel.style.display = 'block';
+      }
+
       const h = _secMap[item.kw.toLowerCase()];
       if (h) {
         h.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        document.querySelectorAll('#toc-list .dict-entry.active').forEach(e => e.classList.remove('active'));
-        el.classList.add('active');
+      } else {
+        // Heading not indexed yet — re-index and retry once
+        _indexDocHeadings();
+        const h2 = _secMap[item.kw.toLowerCase()];
+        if (h2) h2.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     };
   }
@@ -1556,7 +1571,7 @@ async function loadGrammarRef() {
       const d = await res.json();
       grammarMd = d.content;
       showStaticDoc(grammarMd, 'Grammar Reference');
-      requestAnimationFrame(buildGrammarToc);
+      requestAnimationFrame(() => requestAnimationFrame(buildGrammarToc));
     } else {
       showStaticDoc('> Grammar reference not found in this SDK release.', 'Grammar Reference');
       buildGrammarToc();
