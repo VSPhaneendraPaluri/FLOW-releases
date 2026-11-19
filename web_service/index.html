@@ -416,12 +416,6 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
 #welcome h2 { font-size: 20px; color: var(--fg-primary); font-weight: 400; }
 #welcome p  { font-size: 13px; max-width: 400px; text-align: center; line-height: 1.6; }
 #welcome .hint { margin-top: 20px; background: #2d2d2d; border: 1px solid var(--border); border-radius: 6px; padding: 12px 20px; font-size: 12px; font-family: var(--font-mono); }
-.welcome-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
-.welcome-btn { background: #2d2d2d; color: var(--fg-primary); border: 1px solid var(--border); border-radius: 5px; padding: 7px 16px; font-size: 13px; cursor: pointer; }
-.welcome-btn:hover { background: #3a3a3a; border-color: #555; }
-.welcome-btn.primary { background: var(--btn-run); border-color: var(--btn-run); color: #fff; }
-.welcome-btn.primary:hover { background: var(--btn-run-h); }
-#btn-upload-plugin { font-size: 11px; padding: 2px 7px; margin-left: 2px; }
 
 /* ── Output panel ── */
 #output-panel {
@@ -494,14 +488,9 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
     <button id="btn-dismiss-banner" title="Dismiss" onclick="dismissBanner()">✕</button>
   </div>
 
-  <!-- Hidden file inputs -->
-  <input type="file" id="open-flow-input"   accept=".flow,.rules" style="display:none" onchange="openLocalFlow(this)">
-  <input type="file" id="upload-plugin-input" accept=".so,.dll,.dylib" style="display:none" onchange="uploadLocalPlugin(this)">
-
   <!-- Toolbar -->
   <div id="toolbar">
-    <button class="tb-btn" id="btn-open"   onclick="document.getElementById('open-flow-input').click()" title="Open .flow or .rules file from your computer">📂 Open</button>
-    <button class="tb-btn" id="btn-save"   onclick="saveCurrentFile()" title="Save (Ctrl+S)" disabled>💾 Save</button>
+    <button class="tb-btn" id="btn-save" onclick="saveCurrentFile()" title="Save (Ctrl+S)" disabled>💾 Save</button>
     <div class="tb-sep"></div>
 
     <div id="plugin-wrap">
@@ -509,7 +498,6 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
       <select id="plugin-select">
         <option value="">— none —</option>
       </select>
-      <button class="tb-btn" id="btn-upload-plugin" onclick="document.getElementById('upload-plugin-input').click()" title="Upload your own plugin (.so / .dll)">🔌 Upload</button>
     </div>
     <div class="tb-sep"></div>
 
@@ -652,18 +640,10 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
         <div id="welcome">
           <div class="logo">⚡</div>
           <h2>FLOW SDK Playground</h2>
-          <p>Write and run <code>.flow</code> instruction stream scripts against an ISA plugin.</p>
-          <div class="welcome-actions">
-            <button class="welcome-btn primary" onclick="openExampleFlow()">🧪 Open example</button>
-            <button class="welcome-btn" onclick="newScratchpad()">✏️ New scratchpad</button>
-            <button class="welcome-btn" onclick="document.getElementById('open-flow-input').click()">📂 Open .flow file</button>
-          </div>
+          <p>Browse SDK headers, documentation, and examples.<br>
+             Click any file to open and edit it.<br>
+             Use ✏️ to write a new <code>.flow</code> script and run it.</p>
           <div class="hint">flow --plugin toy.so  my_script.flow</div>
-          <p style="font-size:11px;color:var(--fg-secondary);margin-top:12px;line-height:1.7">
-            <strong style="color:var(--fg-primary)">Step 1:</strong> Select or upload a plugin (🔌 Upload in toolbar)<br>
-            <strong style="color:var(--fg-primary)">Step 2:</strong> Open or write a <code>.flow</code> script<br>
-            <strong style="color:var(--fg-primary)">Step 3:</strong> Press ▶ Run
-          </p>
         </div>
       </div>
 
@@ -677,7 +657,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
           </div>
         </div>
         <div id="output-body">
-          <span class="out-line out-info">Ready. Select a plugin, open a .flow script, then press ▶ Run.</span>
+          <span class="out-line out-info">Ready. Open a .flow script and press ▶ Run.</span>
         </div>
       </div>
     </div>
@@ -764,18 +744,13 @@ function registerFlowLanguage() {
   monaco.languages.register({ id: 'flow' });
   const flowTokens = {
     keywords: [
-      'isa','seed','strict','use','const','pool','reserve','bind','init','memory',
-      'before','after','each','defaults','mix','seq','scene','test',
-      'run','crand','until','max','play',
-      'loop','repeat','choose','one','times',
-      'interleave','atomic','branch','taken','not_taken',
-      'with','when','and','or','not','of','in',
-      'label','goto',
-      'check','expect','fault','no',
-      'report','relax','override','forbid','require','group','lock','as','for',
-      'class','property','on','within','any','zero','random','undef','fill','pattern',
-      'counting','load','aligned','in_range',
-      'rules',
+      'isa','seed','strict','use','pool','bind','init','intro','outro',
+      'seq','scene','test','spray','run','play','weave','atomic','loop',
+      'fork','label','goto','with','and','when','of','until','using',
+      'taken','fall','expect','report','atleast','atmost','never','always',
+      'class','property','on','within','repeat','any','zero','random',
+      'undef','fill','pattern','load','times','mix','rules','crand',
+      'defaults','after','each','before',
     ],
     types: ['reg','addr','imm','instr','mem','int'],
     tokenizer: {
@@ -957,87 +932,6 @@ async function loadPlugins() {
       sel.appendChild(opt);
     }
   } catch (e) { console.warn('Plugin fetch failed', e); }
-}
-
-// ── Local file open (.flow / .rules from disk) ─────────────────────────────
-function openLocalFlow(input) {
-  const file = input.files[0];
-  if (!file) return;
-  input.value = '';   // reset so same file can be re-opened
-  const reader = new FileReader();
-  reader.onload = e => {
-    const content = e.target.result;
-    // Check for duplicate tab by name
-    const existing = S.tabs.find(t => t.label === file.name);
-    if (existing) { activateTab(existing.id); return; }
-    const tab = { id: genId(), label: file.name, path: null,
-                  lang: detectLang(file.name), content,
-                  savedContent: content, dirty: false, local: true };
-    S.tabs.push(tab);
-    renderTabs();
-    activateTab(tab.id);
-  };
-  reader.onerror = () => alert('Could not read file: ' + file.name);
-  reader.readAsText(file);
-}
-
-// ── Upload local plugin (.so / .dll / .dylib) ──────────────────────────────
-async function uploadLocalPlugin(input) {
-  const file = input.files[0];
-  if (!file) return;
-  input.value = '';
-  try {
-    appendOutput('info', `[Uploading plugin: ${file.name}…]\n`);
-    const res = await fetch('/api/upload-plugin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/octet-stream',
-                 'X-Plugin-Name': encodeURIComponent(file.name) },
-      body: file
-    });
-    const data = await res.json();
-    if (!res.ok || !data.ok) {
-      appendOutput('error', `[Plugin upload failed] ${data.error || res.statusText}\n`);
-      return;
-    }
-    appendOutput('info', `[Plugin uploaded: ${data.name}]\n`);
-    // Refresh plugin list then auto-select the uploaded plugin
-    await loadPlugins();
-    const sel = document.getElementById('plugin-select');
-    for (const opt of sel.options) {
-      if (opt.textContent === data.name || opt.value === data.rel) {
-        sel.value = opt.value;
-        break;
-      }
-    }
-  } catch (e) {
-    appendOutput('error', `[Plugin upload error] ${e.message}\n`);
-  }
-}
-
-// ── Open first example .flow from SDK tree ─────────────────────────────────
-function openExampleFlow() {
-  // Walk the SDK file tree to find the first .flow file
-  function findFlow(nodes) {
-    for (const n of nodes || []) {
-      if (!n.children && n.name && n.name.endsWith('.flow')) return n;
-      const found = findFlow(n.children);
-      if (found) return found;
-    }
-    return null;
-  }
-  const node = findFlow(S.tree);
-  if (node) {
-    openFile(node.path, node.name);
-  } else {
-    // No SDK loaded yet — open a blank scratchpad with a starter template
-    newScratchpad();
-    const tab = S.tabs.find(t => t.id === S.activeTab);
-    if (tab) {
-      tab.content = '// FLOW example script\n// Select a plugin above, then press ▶ Run\n\nscene main {\n  random 10;\n}\n';
-      tab.savedContent = tab.content;
-      if (S.editor) S.editor.setValue(tab.content);
-    }
-  }
 }
 
 // ── Open file ──────────────────────────────────────────────────────────────
@@ -1279,10 +1173,6 @@ function runScript() {
   const content = getScriptContent();
   if (!content) return;
   const pluginPath = document.getElementById('plugin-select').value;
-  if (!pluginPath) {
-    appendOutput('error', '[Error] No plugin selected. Choose a plugin from the Plugin dropdown\nor upload one with the 🔌 Upload button in the toolbar.\n');
-    return;
-  }
   const tab = S.tabs.find(t => t.id === S.activeTab);
   const scriptPath = tab?.path ?? null;   // relative SDK path → server derives stem
   streamExec('/api/run', { script: content, pluginPath, scriptPath });
@@ -1356,7 +1246,6 @@ const GRAMMAR_DICT = [
   { kw: 'isa',        desc: 'Name the ISA plugin this file targets',                        file: 'rules' },
   { kw: 'pool',       desc: 'Declare a named reg / addr / imm / instr pool with weights',   file: 'rules' },
   { kw: 'reserve',    desc: 'Permanently remove registers from all random draws',           file: 'rules' },
-  { kw: 'bind',       desc: 'Bind a default pool to an operand kind or MNEMONIC.operand',   file: 'rules' },
   { cat: '.rules — Constraints', file: 'rules' },
   { kw: 'forbid',     desc: 'Prohibit an instruction pattern; optionally lock it',          file: 'rules' },
   { kw: 'require',    desc: 'Mandate a condition on a generated instruction',               file: 'rules' },
@@ -1366,8 +1255,6 @@ const GRAMMAR_DICT = [
   { kw: 'for',        desc: 'Identify which operand a require condition applies to',        file: 'rules' },
   { kw: 'in',         desc: 'Pool-membership guard: when instr in <pool>',                  file: 'rules' },
   { kw: 'group',      desc: 'Bundle named rules so a test can relax them together',         file: 'rules' },
-  { kw: 'any',        desc: 'Pool item that matches anything of the pool\'s kind',           file: 'rules' },
-  { kw: 'class',      desc: 'Pool item matching every instruction tagged with this class',   file: 'rules' },
   { cat: '.flow — File level', file: 'flow' },
   { kw: 'use',        desc: 'Import pools, scenes and rules from a .rules or .flow file',   file: 'flow' },
   { kw: 'seed',       desc: 'Pin the RNG seed — same seed + script = identical output',     file: 'flow' },
@@ -1377,22 +1264,11 @@ const GRAMMAR_DICT = [
   { kw: 'mix',        desc: 'Declare instruction-mix targets; engine steers draws to meet them', file: 'flow' },
   { kw: 'before',     desc: 'Run a block before each test (file-level) or this test',       file: 'flow' },
   { kw: 'after',      desc: 'Run a block after each test (file-level) or this test',        file: 'flow' },
-  { kw: 'each',       desc: 'Modifier on before/after — applies the hook to every test',    file: 'flow' },
   { kw: 'init',       desc: 'Set memory or register state before a test runs',              file: 'flow' },
-  { kw: 'memory',     desc: 'Target of init — initialise a memory address range',           file: 'flow' },
-  { kw: 'zero',       desc: 'init value: fill the range with zero',                         file: 'flow' },
-  { kw: 'undef',      desc: 'init value: leave the range unspecified',                      file: 'flow' },
-  { kw: 'random',     desc: 'init value: fill the range with random data',                  file: 'flow' },
-  { kw: 'fill',       desc: 'init value: repeat a single byte across the range',            file: 'flow' },
-  { kw: 'counting',   desc: 'init value: fill the range with an incrementing byte pattern',  file: 'flow' },
-  { kw: 'pattern',    desc: 'init value: fill the range from a named byte pattern',         file: 'flow' },
-  { kw: 'load',       desc: 'init value: load the range\'s contents from a file',            file: 'flow' },
   { cat: '.flow — Structure', file: 'flow' },
-  { kw: 'seq',        desc: 'Reusable named directed-instruction block — no random draws',  file: 'flow' },
   { kw: 'scene',      desc: 'Reusable named parameterised fragment of test logic',          file: 'flow' },
   { kw: 'test',       desc: 'Top-level unit of generation — produces one instruction stream', file: 'flow' },
   { cat: '.flow — Generation', file: 'flow' },
-  { kw: 'play',       desc: 'Randomly pick one weighted scene/sequence entry per invocation', file: 'flow' },
   { kw: 'crand',      desc: 'Draw N random instructions from a pool (constrained-random)',  file: 'flow' },
   { kw: 'until',      desc: 'Draw until a condition holds — use with max as a safety cap',  file: 'flow' },
   { kw: 'max',        desc: 'Safety cap on an until expression — errors if hit',            file: 'flow' },
@@ -1400,8 +1276,6 @@ const GRAMMAR_DICT = [
   { kw: 'repeat',     desc: 'Execute a block N times as independent random draws',          file: 'flow' },
   { kw: 'loop',       desc: 'Emit a counted loop with auto-generated counter/branch code',  file: 'flow' },
   { kw: 'choose',     desc: 'Pick one weighted arm per iteration (choose one / N times)',   file: 'flow' },
-  { kw: 'one',        desc: 'choose modifier — pick exactly one arm, once',                 file: 'flow' },
-  { kw: 'times',      desc: 'choose modifier — repeat the weighted pick N times',           file: 'flow' },
   { kw: 'interleave', desc: 'Merge child blocks, preserving per-block order',               file: 'flow' },
   { kw: 'atomic',     desc: 'Indivisible unit inside interleave — never split by interleaver', file: 'flow' },
   { kw: 'branch',     desc: 'Emit a branch with weighted taken / not_taken arms',           file: 'flow' },
@@ -1412,18 +1286,11 @@ const GRAMMAR_DICT = [
   { kw: 'relax',      desc: 'Disable a named rule or group for this test only',             file: 'flow' },
   { kw: 'override',   desc: 'Replace the body of a named rule for this test only',          file: 'flow' },
   { kw: 'check',      desc: 'Assert a register or memory value against the arch model',     file: 'flow' },
-  { kw: 'aligned',    desc: 'Condition: operand address is a multiple of N bytes',          file: 'flow' },
-  { kw: 'in_range',   desc: 'Condition: operand address falls within [low, high]',          file: 'flow' },
   { kw: 'expect',     desc: 'Declare that enclosed instructions should raise a fault',      file: 'flow' },
   { kw: 'fault',      desc: 'Names the expected fault kind inside an expect block',         file: 'flow' },
-  { kw: 'no',         desc: '"expect no fault" — asserts the block raises no fault at all', file: 'flow' },
   { kw: 'label',      desc: 'Define a jump target within a test or scene',                  file: 'flow' },
   { kw: 'goto',       desc: 'Jump unconditionally to a label',                              file: 'flow' },
   { kw: 'report',     desc: 'Print mix or rule results at end of test (mix / rules)',       file: 'flow' },
-  { cat: '.flow — Expressions', file: 'flow' },
-  { kw: 'and',        desc: 'Boolean AND in a when/check/until expression',                 file: 'flow' },
-  { kw: 'or',         desc: 'Boolean OR in a when/check/until expression',                  file: 'flow' },
-  { kw: 'not',        desc: 'Boolean NOT in a when/check/until expression',                 file: 'flow' },
 ];
 
 let _tocFilter = 'all';
@@ -1490,7 +1357,7 @@ function _makeEntry(item) {
       document.querySelectorAll('#toc-list .dict-entry.active').forEach(e => e.classList.remove('active'));
       el.classList.add('active');
 
-      // Ensure the doc-panel is visible (it may be hidden when a code tab is active)
+      // Ensure doc-panel is visible (it may be hidden when a code tab is active)
       const docPanel = document.getElementById('doc-panel');
       if (docPanel.style.display === 'none' || docPanel.style.display === '') {
         document.getElementById('welcome').style.display = 'none';
