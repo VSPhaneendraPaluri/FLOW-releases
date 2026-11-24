@@ -622,12 +622,20 @@ app.post('/api/validate', (req, res) => {
     if (!FLOW_BIN && !VALID_BIN) {
         sseMsg(res, 'stderr', 'No FLOW binary found.\n'); return sseDone(res, 1);
     }
-    const { script, scriptPath } = req.body;
+    const { script, pluginPath, scriptPath } = req.body;
     const tmp = writeTempScript(script || '', scriptPath, '_flow_val');
     const cwd = path.dirname(tmp);
 
     const bin  = VALID_BIN || FLOW_BIN;
-    const args = VALID_BIN ? [tmp] : ['--validate', tmp];
+    // flow-validate takes just the script; flow-cli has no --validate flag —
+    // run the script normally (parse + ISA check) using the same plugin the
+    // Run panel would use, then treat any non-zero exit as a validation error.
+    const args = [];
+    if (!VALID_BIN && pluginPath) {
+        args.push('--plugin', path.isAbsolute(pluginPath)
+            ? pluginPath : path.join(SDK_ROOT, pluginPath));
+    }
+    args.push(tmp);
     sseMsg(res, 'info',
         `$ ${path.basename(bin)} ${args.map(a => path.basename(a)).join(' ')}\n`);
 

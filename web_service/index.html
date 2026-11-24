@@ -1181,7 +1181,10 @@ function runScript() {
 function validateScript() {
   const content = getScriptContent();
   if (!content) return;
-  streamExec('/api/validate', { script: content });
+  const pluginPath = document.getElementById('plugin-select').value;
+  const tab = S.tabs.find(t => t.id === S.activeTab);
+  const scriptPath = tab?.path ?? null;
+  streamExec('/api/validate', { script: content, pluginPath, scriptPath });
 }
 
 function stopExec() {
