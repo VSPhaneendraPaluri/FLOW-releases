@@ -562,12 +562,13 @@ function writeTempScript(content, scriptPath, prefix) {
             return tmp;
         }
     }
-    // 2. Script uses a relative rules file — find it in the SDK and write next to it
+    // 2. Script uses a relative file (*.rules or *.flow) — find it in the SDK
+    //    and write the temp file adjacent to it so relative `use` paths resolve.
     if (SDK_ROOT) {
-        const m = content.match(/use\s+"([^"]+\.rules)"/);
+        const m = content.match(/use\s+"([^"]+\.(rules|flow))"/);
         if (m) {
-            const rulesName = path.basename(m[1]);
-            const found = findFileInSdk(SDK_ROOT, rulesName);
+            const refName = path.basename(m[1]);
+            const found = findFileInSdk(SDK_ROOT, refName);
             if (found) {
                 const tmp = path.join(path.dirname(found), `${prefix}_${Date.now()}.flow`);
                 fs.writeFileSync(tmp, content, 'utf8');
