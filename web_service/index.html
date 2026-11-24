@@ -1173,7 +1173,7 @@ function runScript() {
   const content = getScriptContent();
   if (!content) return;
   const pluginPath = document.getElementById('plugin-select').value;
-  const tab = S.tabs.find(t => t.id === S.activeTab);
+  const tab = activeTab();
   const scriptPath = tab?.path ?? null;   // relative SDK path → server derives stem
   streamExec('/api/run', { script: content, pluginPath, scriptPath });
 }
@@ -1182,7 +1182,7 @@ function validateScript() {
   const content = getScriptContent();
   if (!content) return;
   const pluginPath = document.getElementById('plugin-select').value;
-  const tab = S.tabs.find(t => t.id === S.activeTab);
+  const tab = activeTab();
   const scriptPath = tab?.path ?? null;
   streamExec('/api/validate', { script: content, pluginPath, scriptPath });
 }

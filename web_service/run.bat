@@ -1,4 +1,5 @@
 @echo off
+setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
 echo.
@@ -32,9 +33,9 @@ if errorlevel 1 (
 
 if not defined SDK_ZIP_PATH (
     set "_FLOW_DIST=%~dp0..\..\flow\dist"
-    for /f "delims=" %%F in ('dir /b /o-d "%_FLOW_DIST%\flow-sdk-*-Windows.zip" 2^>nul') do (
+    for /f "delims=" %%F in ('dir /b /o-d "!_FLOW_DIST!\flow-sdk-*-Windows.zip" 2^>nul') do (
         if not defined SDK_ZIP_PATH (
-            set "SDK_ZIP_PATH=%_FLOW_DIST%\%%F"
+            set "SDK_ZIP_PATH=!_FLOW_DIST!\%%F"
         )
     )
     set "_FLOW_DIST="
