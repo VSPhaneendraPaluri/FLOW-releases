@@ -226,6 +226,7 @@ nav ul a:hover { color: var(--text); }
 .stats-inner .stat:nth-child(7)::before  { background: var(--cyan);    box-shadow: 0 0 6px rgba(61,184,224,0.6); }
 .stats-inner .stat:nth-child(9)::before  { background: var(--purple);  box-shadow: 0 0 6px rgba(155,126,229,0.6); }
 .stats-inner .stat:nth-child(11)::before { background: var(--teal);    box-shadow: 0 0 6px rgba(34,184,153,0.6); }
+.stats-inner .stat:nth-child(13)::before { background: var(--accent);  box-shadow: 0 0 6px rgba(61,142,240,0.6); }
 .stat-sep { width: 1px; height: 14px; background: #2E4A6E; }
 
 /* ── SECTIONS ── */
@@ -390,7 +391,7 @@ code {
   background: var(--border); border-radius: 6px; overflow: hidden;
   margin-top: 40px;
 }
-.qs-path { background: var(--surface); padding: 28px 26px; }
+.qs-path { background: var(--surface); padding: 28px 26px; min-width: 0; }
 .qs-tier-badge {
   display: inline-block; font-family: var(--mono); font-size: 0.67rem;
   padding: 2px 8px; border-radius: 3px; border: 1px solid;
@@ -899,6 +900,8 @@ footer a:hover { text-decoration: underline; }
     <span class="stat">Linux &amp; Windows</span>
     <span class="stat-sep"></span>
     <span class="stat">Platform-aware workloads</span>
+    <span class="stat-sep"></span>
+    <span class="stat">Pluggable solvers</span>
   </div>
 </div>
 
@@ -1189,6 +1192,78 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
+<!-- ── SOLVER BACKENDS ── -->
+<section id="solver">
+  <div class="wrap">
+    <div class="slabel">constraint solving</div>
+    <h2>Default solver, or bring your own.</h2>
+    <p>Every script runs on a built-in solver out of the box. When a script's
+       constraint envelope gets demanding &mdash; large reserved-register sets,
+       tight cross-operand rules &mdash; swap in a different solving backend
+       without touching the script or rebuilding the engine.</p>
+
+    <div class="qs-paths" style="margin-top:32px">
+
+      <!-- PATH: Default solver -->
+      <div class="qs-path">
+        <div class="qs-path-head">
+          <span class="qs-tier-badge" style="color:var(--teal);border-color:rgba(34,184,153,0.4)">Built in &mdash; zero setup</span>
+          <h3>Default solver</h3>
+          <p>Ships with the engine and runs automatically &mdash; no flag, no
+             extra download. Covers the constraint envelope of the large
+             majority of scripts out of the box.</p>
+        </div>
+        <div class="qs-steps">
+          <div class="qs-step">
+            <div class="qs-step-num">1</div>
+            <div class="qs-step-body">
+              <div class="qs-step-label">Just run your script</div>
+              <div class="codeblock-wrap">
+                <div class="codeblock-bar">
+                  <span class="cbdot"></span><span class="cbdot"></span><span class="cbdot"></span>
+                  <span>terminal</span>
+                </div>
+                <div class="codeblock"><span class="cm">flow</span> <span class="cf">--isa-dir</span> <span class="cp">my_isa/</span> <span class="cm">load_stress.flow</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PATH: Custom solver -->
+      <div class="qs-path">
+        <div class="qs-path-head">
+          <span class="qs-tier-badge" style="color:var(--purple);border-color:rgba(155,126,229,0.4)">Plugin &mdash; same mechanism as an ISA</span>
+          <h3>Custom solver</h3>
+          <p>Load an alternate constraint-solving backend at runtime, built
+             and distributed on its own, independent of the core SDK.</p>
+          <p class="qs-note">&#9432;&nbsp; The loading mechanism ships today.
+             More backends &mdash; and SDK headers for authoring your own &mdash;
+             are on the way, each released independently.
+             Backends you load are your own integration &mdash; FLOW makes no
+             representation about third-party plugin behavior.</p>
+        </div>
+        <div class="qs-steps">
+          <div class="qs-step">
+            <div class="qs-step-num">1</div>
+            <div class="qs-step-body">
+              <div class="qs-step-label">Point FLOW at the compiled backend</div>
+              <div class="codeblock-wrap">
+                <div class="codeblock-bar">
+                  <span class="cbdot"></span><span class="cbdot"></span><span class="cbdot"></span>
+                  <span>terminal</span>
+                </div>
+                <div class="codeblock"><span class="cm">flow</span> <span class="cf">--isa-dir</span> <span class="cp">my_isa/</span> <span class="cf">\</span>
+     <span class="cf">--solver-plugin</span> <span class="cp">./solver.so</span> <span class="cm">test.flow</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ── QUICK START ── -->
 <section id="quickstart">
   <div class="wrap">
@@ -1340,6 +1415,7 @@ footer a:hover { text-decoration: underline; }
         <tr><td>--plugin &lt;path&gt;</td><td>Load a compiled ISA plugin (.so / .dll)</td></tr>
         <tr><td>--isa-dir &lt;path&gt;</td><td>Load a pure-YAML ISA from a directory (instructions.yml + registers.yml required)</td></tr>
         <tr><td>--isa &lt;name&gt;</td><td>Override ISA name (default: taken from script or YAML)</td></tr>
+        <tr><td>--solver-plugin &lt;path&gt;</td><td>Load a constraint-solver backend plugin (repeatable)</td></tr>
         <tr><td>--seed &lt;n&gt;</td><td>Fix the RNG seed for reproducible, bit-identical output</td></tr>
         <tr><td>--count &lt;n&gt;</td><td>Number of instruction sequences to generate</td></tr>
         <tr><td>--output &lt;file&gt;</td><td>Write output to file (default: stdout)</td></tr>
