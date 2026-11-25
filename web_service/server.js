@@ -620,7 +620,7 @@ app.post('/api/run', (req, res) => {
     if (!pluginPath) { sseMsg(res, 'stderr', 'No plugin selected. Choose an ISA plugin from the Plugin drop-down before running.\n'); return sseDone(res, 1); }
 
     const temp = writeTempScript(script, scriptPath, '_flow_run');
-    const { tmp, dir } = temp;
+    const { tmp, dir, uniq } = temp;
     // cwd is the script's own real directory (no extra nesting), so relative
     // `use` paths resolve exactly as they would for the real file.
     const cwd = dir;
@@ -635,10 +635,13 @@ app.post('/api/run', (req, res) => {
     sseMsg(res, 'info',
         `$ ${path.basename(FLOW_BIN)} ${[...args.slice(0, -1), displayNameRun].join(' ')}\n`);
 
-    // Mask the temp filename in binary output → show the real basename instead.
-    const maskRun = scriptPath
-        ? s => s.split(path.basename(tmp)).join(path.basename(scriptPath))
-        : s => s;
+    // Strip the unique run-prefix from the live binary output → every
+    // generated file the binary reports (the script itself, and every
+    // "<name> -> .../<uniq>.<stem>.<test>.asm" line it prints) carries the
+    // same literal "<uniq>." prefix, since they all derive from the same
+    // stem. Stripping it here shows the real final filename immediately,
+    // matching what cleanupTempScript renames it to on disk afterward.
+    const maskRun = uniq ? s => s.split(uniq + '.').join('') : s => s;
 
     const proc = spawn(FLOW_BIN, args, { cwd });
     proc.stdout.on('data', d => sseMsg(res, 'stdout', maskRun(d.toString())));
@@ -660,7 +663,7 @@ app.post('/api/validate', (req, res) => {
     }
     const { script, pluginPath, scriptPath } = req.body;
     const temp = writeTempScript(script || '', scriptPath, '_flow_val');
-    const { tmp, dir } = temp;
+    const { tmp, dir, uniq } = temp;
     const cwd = dir;
 
     const bin  = VALID_BIN || FLOW_BIN;
@@ -677,9 +680,7 @@ app.post('/api/validate', (req, res) => {
     sseMsg(res, 'info',
         `$ ${path.basename(bin)} ${[...args.slice(0, -1), displayNameVal].join(' ')}\n`);
 
-    const maskVal = scriptPath
-        ? s => s.split(path.basename(tmp)).join(path.basename(scriptPath))
-        : s => s;
+    const maskVal = uniq ? s => s.split(uniq + '.').join('') : s => s;
     const proc = spawn(bin, args, { cwd });
     proc.stdout.on('data', d => sseMsg(res, 'stdout', maskVal(d.toString())));
     proc.stderr.on('data', d => sseMsg(res, 'stderr', maskVal(d.toString())));
