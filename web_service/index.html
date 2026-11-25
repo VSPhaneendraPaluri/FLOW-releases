@@ -1166,6 +1166,11 @@ async function streamExec(endpoint, body) {
     setRunning(false);
     S.currentProc = null;
     updateRunBtns();
+    // Run (not Validate) can produce new .asm files next to the script —
+    // refresh the sidebar tree so they show up without a manual page reload.
+    if (endpoint === '/api/run') {
+      try { await loadTree(); } catch {}
+    }
   }
 }
 

@@ -552,24 +552,60 @@ function findFileInSdk(dir, name) {
     return null;
 }
 
-function writeTempScript(content, scriptPath, _prefix) {
-    // Write the temp script using the exact original filename directly into
-    // the original script's directory so:
-    //   1. Relative `use` imports resolve identically to the real file.
-    //   2. The binary names outputs after the script stem (directed.*.asm).
-    // The caller deletes this file after the process exits.
+function writeTempScript(content, scriptPath, prefix) {
+    // Write the temp script directly in the real script's own directory, at
+    // the SAME depth as the original file, so relative `use "../x"` imports
+    // resolve exactly as they would for the real file.
+    //
+    // A previous version isolated concurrent runs with a `_run_<timestamp>/`
+    // subdirectory *under* the real directory — that shifted every script
+    // one directory level deeper, which silently broke every relative `use`
+    // by exactly one level (e.g. a script's `use "../common/common.flow"`
+    // could no longer find it, so `common.flow`'s own
+    // `use "../arch/toy.rules"` never loaded either — surfacing as
+    // "'crand' references undefined pool 'alu_rr'", since the validator
+    // swallows a failed import and only reports the resulting undefined
+    // symbol). Isolation now comes from a unique filename prefix instead of
+    // an extra directory level.
+    const uniq = `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     if (scriptPath && SDK_ROOT) {
         const dir = path.join(SDK_ROOT, path.dirname(scriptPath));
         if (fs.existsSync(dir)) {
-            const tmp = path.join(dir, path.basename(scriptPath));
+            const origBase = path.basename(scriptPath);   // e.g. directed.flow
+            const tmpBase  = `${uniq}.${origBase}`;         // e.g. _flow_run_169….directed.flow
+            const tmp      = path.join(dir, tmpBase);
             fs.writeFileSync(tmp, content, 'utf8');
-            return tmp;
+            return { tmp, dir, uniq, isTempDir: false };
         }
     }
-    // Fallback for scratchpad (no SDK path).
-    const tmp = path.join(os.tmpdir(), `script_${Date.now()}.flow`);
+    const runDir = path.join(os.tmpdir(), `_flow_${Date.now()}`);
+    fs.mkdirSync(runDir, { recursive: true });
+    const tmp = path.join(runDir, 'script.flow');
     fs.writeFileSync(tmp, content, 'utf8');
-    return tmp;
+    return { tmp, dir: runDir, uniq: null, isTempDir: true };
+}
+
+// Rename every generated output file that carries the unique run-prefix back
+// to its real stem (e.g. "_flow_run_169….directed.alu.asm" →
+// "directed.alu.asm"), and remove the temp script itself. When the run used
+// the os.tmpdir() fallback (isTempDir), there's no "real" directory to
+// restore into, so the whole temp dir is just removed instead.
+function cleanupTempScript({ tmp, dir, uniq, isTempDir }) {
+    if (isTempDir) {
+        try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+        return;
+    }
+    if (uniq) {
+        try {
+            for (const f of fs.readdirSync(dir)) {
+                if (!f.startsWith(uniq + '.')) continue;
+                if (f === path.basename(tmp)) continue; // the script itself — unlinked below
+                const stripped = f.slice(uniq.length + 1);
+                try { fs.renameSync(path.join(dir, f), path.join(dir, stripped)); } catch {}
+            }
+        } catch {}
+    }
+    try { fs.unlinkSync(tmp); } catch {}
 }
 
 // ── API: run ───────────────────────────────────────────────────────────────
@@ -583,8 +619,11 @@ app.post('/api/run', (req, res) => {
     if (!script) { sseMsg(res, 'stderr', 'No script content.\n'); return sseDone(res, 1); }
     if (!pluginPath) { sseMsg(res, 'stderr', 'No plugin selected. Choose an ISA plugin from the Plugin drop-down before running.\n'); return sseDone(res, 1); }
 
-    const tmp = writeTempScript(script, scriptPath, '_flow_run');
-    const cwd = path.dirname(tmp); // real script dir — `use` imports resolve correctly
+    const temp = writeTempScript(script, scriptPath, '_flow_run');
+    const { tmp, dir } = temp;
+    // cwd is the script's own real directory (no extra nesting), so relative
+    // `use` paths resolve exactly as they would for the real file.
+    const cwd = dir;
 
     const args = [];
     if (pluginPath) {
@@ -596,12 +635,17 @@ app.post('/api/run', (req, res) => {
     sseMsg(res, 'info',
         `$ ${path.basename(FLOW_BIN)} ${[...args.slice(0, -1), displayNameRun].join(' ')}\n`);
 
+    // Mask the temp filename in binary output → show the real basename instead.
+    const maskRun = scriptPath
+        ? s => s.split(path.basename(tmp)).join(path.basename(scriptPath))
+        : s => s;
+
     const proc = spawn(FLOW_BIN, args, { cwd });
-    proc.stdout.on('data', d => sseMsg(res, 'stdout', d.toString()));
-    proc.stderr.on('data', d => sseMsg(res, 'stderr', d.toString()));
+    proc.stdout.on('data', d => sseMsg(res, 'stdout', maskRun(d.toString())));
+    proc.stderr.on('data', d => sseMsg(res, 'stderr', maskRun(d.toString())));
     proc.on('error', e => { sseMsg(res, 'stderr', `Error: ${e.message}\n`); sseDone(res, -1); });
     proc.on('close', code => {
-        try { fs.unlinkSync(tmp); } catch {} // remove only the temp script; .asm files stay
+        cleanupTempScript(temp);
         sseMsg(res, code === 0 ? 'info' : 'stderr', `\n[Exited with code ${code}]\n`);
         sseDone(res, code);
     });
@@ -615,8 +659,9 @@ app.post('/api/validate', (req, res) => {
         sseMsg(res, 'stderr', 'No FLOW binary found.\n'); return sseDone(res, 1);
     }
     const { script, pluginPath, scriptPath } = req.body;
-    const tmp = writeTempScript(script || '', scriptPath, '_flow_val');
-    const cwd = path.dirname(tmp); // real script dir — `use` imports resolve correctly
+    const temp = writeTempScript(script || '', scriptPath, '_flow_val');
+    const { tmp, dir } = temp;
+    const cwd = dir;
 
     const bin  = VALID_BIN || FLOW_BIN;
     // flow-validate takes just the script; flow-cli has no --validate flag —
@@ -632,12 +677,15 @@ app.post('/api/validate', (req, res) => {
     sseMsg(res, 'info',
         `$ ${path.basename(bin)} ${[...args.slice(0, -1), displayNameVal].join(' ')}\n`);
 
+    const maskVal = scriptPath
+        ? s => s.split(path.basename(tmp)).join(path.basename(scriptPath))
+        : s => s;
     const proc = spawn(bin, args, { cwd });
-    proc.stdout.on('data', d => sseMsg(res, 'stdout', d.toString()));
-    proc.stderr.on('data', d => sseMsg(res, 'stderr', d.toString()));
+    proc.stdout.on('data', d => sseMsg(res, 'stdout', maskVal(d.toString())));
+    proc.stderr.on('data', d => sseMsg(res, 'stderr', maskVal(d.toString())));
     proc.on('error', e => { sseMsg(res, 'stderr', `Error: ${e.message}\n`); sseDone(res, -1); });
     proc.on('close', code => {
-        try { fs.unlinkSync(tmp); } catch {}
+        cleanupTempScript(temp);
         sseMsg(res, code === 0 ? 'info' : 'stderr', `\n[Exited with code ${code}]\n`);
         sseDone(res, code);
     });
