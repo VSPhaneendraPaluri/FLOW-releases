@@ -4,8 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FLOW SDK Playground</title>
-<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
+<!-- marked must load before the Monaco AMD loader below: Monaco's loader.js
+     defines a global AMD `define()` (with `define.amd` set), and marked's UMD
+     wrapper checks for that before falling back to a plain global — if AMD is
+     already present when marked loads, it registers itself as an anonymous
+     AMD module instead of setting `window.marked`, and every `marked.parse()`
+     call in this file throws "marked is not defined". -->
 <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
