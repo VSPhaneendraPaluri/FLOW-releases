@@ -1332,6 +1332,8 @@ const GRAMMAR_DICT = [
   { kw: 'repeat',     desc: 'Execute a block N times as independent random draws',          file: 'flow' },
   { kw: 'loop',       desc: 'Emit a counted loop with auto-generated counter/branch code',  file: 'flow' },
   { kw: 'choose',     desc: 'Pick one weighted arm per iteration (choose one / N times)',   file: 'flow' },
+  { kw: 'one',        desc: 'choose one { } — pick a single arm, once',                     file: 'flow' },
+  { kw: 'times',      desc: 'choose N times { } — repeat the weighted pick N times',         file: 'flow' },
   { kw: 'interleave', desc: 'Merge child blocks, preserving per-block order',               file: 'flow' },
   { kw: 'atomic',     desc: 'Indivisible unit inside interleave — never split by interleaver', file: 'flow' },
   { kw: 'branch',     desc: 'Emit a branch with weighted taken / not_taken arms',           file: 'flow' },
@@ -1489,14 +1491,16 @@ async function loadGrammarRef() {
     return;
   }
   try {
-    const res = await fetch('/api/file?path=docs/grammar_v2.md');
+    // Served as a static asset (web_service/assets/docs/grammar_v2.md), not
+    // part of the downloaded SDK release — fetch it directly as text, not
+    // through /api/file (which only resolves paths inside SDK_ROOT).
+    const res = await fetch('/assets/docs/grammar_v2.md');
     if (res.ok) {
-      const d = await res.json();
-      grammarMd = d.content;
+      grammarMd = await res.text();
       showStaticDoc(grammarMd, 'Grammar Reference');
       requestAnimationFrame(() => requestAnimationFrame(buildGrammarToc));
     } else {
-      showStaticDoc('> Grammar reference not found in this SDK release.', 'Grammar Reference');
+      showStaticDoc('> Grammar reference could not be loaded.', 'Grammar Reference');
       buildGrammarToc();
     }
   } catch {

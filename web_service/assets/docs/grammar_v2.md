@@ -264,7 +264,8 @@ mix {
 
 ---
 
-### `before` / `after`
+### `before`
+### `after`
 
 File-level: `before each test { }` and `after each test { }` run around every test in the file.
 Test-local: `before { }` and `after { }` inside a test run only for that test.
@@ -374,7 +375,8 @@ crand instr_load until instr in ldq_only max 500
 
 ---
 
-### `until` / `max`
+### `until`
+### `max`
 
 An alternative count for `crand` — draws continue until a condition holds. `max` sets a safety cap; the run errors if it is hit without the condition becoming true.
 
@@ -448,7 +450,8 @@ choose one {
 
 ---
 
-### `one` / `times`
+### `one`
+### `times`
 
 Variants of `choose`. `one` picks a single arm; `times` repeats the selection N times.
 
@@ -522,7 +525,8 @@ scene likely_taken_branch {
 
 ---
 
-### `taken` / `not_taken`
+### `taken`
+### `not_taken`
 
 The two arms of a `branch` block. Weights default to equal if unspecified.
 
@@ -593,7 +597,8 @@ override load_align_q {
 
 ---
 
-### `expect` / `fault`
+### `expect`
+### `fault`
 
 Declares that the enclosed instructions should raise a specific fault. Used with a reference model to test fault-handling paths.
 
@@ -608,7 +613,8 @@ expect fault misaligned_load {
 
 ---
 
-### `label` / `goto`
+### `label`
+### `goto`
 
 Defines a jump target (`label`) and an unconditional branch to it (`goto`). Labels are test-global when written directly in a test; uniquified per instantiation when written in a scene.
 
@@ -639,11 +645,12 @@ report rules  # each rule, its target, achieved value, and pass/fail
 
 ---
 
-### `and` / `or` / `not`
+### `&&` / `||` / `!`
 
-Boolean operators for guard expressions.
+Boolean operators for guard expressions. FLOW uses symbolic operators, not the
+word forms `and` / `or` / `not` — those are not recognized by the parser.
 
 ```
-forbid SHL <gpr>, <gpr>, <shamt>  when shamt >= 64 and shamt < 128
-when !sbuf.full or rob.occupancy < 4
+forbid SHL <gpr>, <gpr>, <shamt>  when shamt >= 64 && shamt < 128
+when !sbuf.full || rob.occupancy < 4
 ```
