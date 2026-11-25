@@ -572,25 +572,30 @@ function writeTempScript(content, scriptPath, prefix) {
         const dir = path.join(SDK_ROOT, path.dirname(scriptPath));
         if (fs.existsSync(dir)) {
             const origBase = path.basename(scriptPath);   // e.g. directed.flow
+            const stem     = origBase.replace(/\.[^.]+$/, ''); // e.g. directed
             const tmpBase  = `${uniq}.${origBase}`;         // e.g. _flow_run_169….directed.flow
             const tmp      = path.join(dir, tmpBase);
             fs.writeFileSync(tmp, content, 'utf8');
-            return { tmp, dir, uniq, isTempDir: false };
+            return { tmp, dir, uniq, stem, isTempDir: false };
         }
     }
     const runDir = path.join(os.tmpdir(), `_flow_${Date.now()}`);
     fs.mkdirSync(runDir, { recursive: true });
     const tmp = path.join(runDir, 'script.flow');
     fs.writeFileSync(tmp, content, 'utf8');
-    return { tmp, dir: runDir, uniq: null, isTempDir: true };
+    return { tmp, dir: runDir, uniq: null, stem: null, isTempDir: true };
 }
 
 // Rename every generated output file that carries the unique run-prefix back
-// to its real stem (e.g. "_flow_run_169….directed.alu.asm" →
-// "directed.alu.asm"), and remove the temp script itself. When the run used
-// the os.tmpdir() fallback (isTempDir), there's no "real" directory to
-// restore into, so the whole temp dir is just removed instead.
-function cleanupTempScript({ tmp, dir, uniq, isTempDir }) {
+// to a clean name, and remove the temp script itself. The CLI's own output
+// stem is always "<script-stem>.<scene>.asm" (e.g. "directed.alu.asm") —
+// here in the Playground every script already lives in its own example
+// folder, so that repeated stem is just noise; this strips it down to
+// "<scene>.asm" for display/storage. (The real flow-cli output naming is
+// untouched — this is cosmetic, Playground-only.) When the run used the
+// os.tmpdir() fallback (isTempDir), there's no "real" directory to restore
+// into, so the whole temp dir is just removed instead.
+function cleanupTempScript({ tmp, dir, uniq, stem, isTempDir }) {
     if (isTempDir) {
         try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
         return;
@@ -600,13 +605,18 @@ function cleanupTempScript({ tmp, dir, uniq, isTempDir }) {
             for (const f of fs.readdirSync(dir)) {
                 if (!f.startsWith(uniq + '.')) continue;
                 if (f === path.basename(tmp)) continue; // the script itself — unlinked below
-                const stripped = f.slice(uniq.length + 1);
+                let stripped = f.slice(uniq.length + 1); // "<stem>.<scene>.asm"
+                if (stem && stripped.startsWith(stem + '.')) {
+                    stripped = stripped.slice(stem.length + 1); // "<scene>.asm"
+                }
                 try { fs.renameSync(path.join(dir, f), path.join(dir, stripped)); } catch {}
             }
         } catch {}
     }
     try { fs.unlinkSync(tmp); } catch {}
 }
+
+function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 // ── API: run ───────────────────────────────────────────────────────────────
 app.post('/api/run', (req, res) => {
@@ -620,7 +630,7 @@ app.post('/api/run', (req, res) => {
     if (!pluginPath) { sseMsg(res, 'stderr', 'No plugin selected. Choose an ISA plugin from the Plugin drop-down before running.\n'); return sseDone(res, 1); }
 
     const temp = writeTempScript(script, scriptPath, '_flow_run');
-    const { tmp, dir, uniq } = temp;
+    const { tmp, dir, uniq, stem } = temp;
     // cwd is the script's own real directory (no extra nesting), so relative
     // `use` paths resolve exactly as they would for the real file.
     const cwd = dir;
@@ -641,7 +651,16 @@ app.post('/api/run', (req, res) => {
     // same literal "<uniq>." prefix, since they all derive from the same
     // stem. Stripping it here shows the real final filename immediately,
     // matching what cleanupTempScript renames it to on disk afterward.
-    const maskRun = uniq ? s => s.split(uniq + '.').join('') : s => s;
+    // Also drop the redundant "<stem>." from generated .asm names only —
+    // never from the script's own "<stem>.flow" reference.
+    const stemAsmRe = stem ? new RegExp(escapeRegExp(stem) + '\\.([^./\\\\]+\\.asm)', 'g') : null;
+    const maskRun = uniq
+        ? s => {
+            let out = s.split(uniq + '.').join('');
+            if (stemAsmRe) out = out.replace(stemAsmRe, '$1');
+            return out;
+          }
+        : s => s;
 
     const proc = spawn(FLOW_BIN, args, { cwd });
     proc.stdout.on('data', d => sseMsg(res, 'stdout', maskRun(d.toString())));
@@ -663,7 +682,7 @@ app.post('/api/validate', (req, res) => {
     }
     const { script, pluginPath, scriptPath } = req.body;
     const temp = writeTempScript(script || '', scriptPath, '_flow_val');
-    const { tmp, dir, uniq } = temp;
+    const { tmp, dir, uniq, stem } = temp;
     const cwd = dir;
 
     const bin  = VALID_BIN || FLOW_BIN;
@@ -680,7 +699,14 @@ app.post('/api/validate', (req, res) => {
     sseMsg(res, 'info',
         `$ ${path.basename(bin)} ${[...args.slice(0, -1), displayNameVal].join(' ')}\n`);
 
-    const maskVal = uniq ? s => s.split(uniq + '.').join('') : s => s;
+    const stemAsmReVal = stem ? new RegExp(escapeRegExp(stem) + '\\.([^./\\\\]+\\.asm)', 'g') : null;
+    const maskVal = uniq
+        ? s => {
+            let out = s.split(uniq + '.').join('');
+            if (stemAsmReVal) out = out.replace(stemAsmReVal, '$1');
+            return out;
+          }
+        : s => s;
     const proc = spawn(bin, args, { cwd });
     proc.stdout.on('data', d => sseMsg(res, 'stdout', maskVal(d.toString())));
     proc.stderr.on('data', d => sseMsg(res, 'stderr', maskVal(d.toString())));
