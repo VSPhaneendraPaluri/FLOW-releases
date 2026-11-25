@@ -134,6 +134,14 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
   font-family: var(--font-mono); max-width: 220px;
 }
 #plugin-select option { background: #252526; }
+#solver-wrap { display: flex; align-items: center; gap: 5px; margin-left: 4px; }
+#solver-wrap label { font-size: 11px; color: var(--fg-secondary); }
+#solver-select {
+  background: #3a3a3a; border: 1px solid var(--border); color: var(--fg-primary);
+  font-size: 12px; padding: 3px 6px; border-radius: 3px;
+  font-family: var(--font-mono); max-width: 140px;
+}
+#solver-select option { background: #252526; }
 
 .tb-status { margin-left: auto; font-size: 11px; color: var(--fg-secondary); }
 #run-indicator { display: none; }
@@ -501,6 +509,14 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-workbench); co
     </div>
     <div class="tb-sep"></div>
 
+    <div id="solver-wrap">
+      <label for="solver-select">Solver:</label>
+      <select id="solver-select">
+        <option value="">— default —</option>
+      </select>
+    </div>
+    <div class="tb-sep"></div>
+
     <button class="tb-btn" id="btn-run"      onclick="runScript()"      disabled>▶ Run</button>
     <button class="tb-btn" id="btn-validate" onclick="validateScript()" disabled>✓ Validate</button>
     <button class="tb-btn" id="btn-stop"     onclick="stopExec()">■ Stop</button>
@@ -737,6 +753,7 @@ require(['vs/editor/editor.main'], () => {
   loadStatus();
   loadTree();
   loadPlugins();
+  loadSolvers();
 });
 
 // ── FLOW language ──────────────────────────────────────────────────────────
@@ -851,9 +868,10 @@ async function reloadSdk() {
     appendOutput('info', `SDK reloaded → v${data.sdkVersion}\n`);
     dismissBanner();
 
-    // Refresh tree and plugins for the new SDK content
+    // Refresh tree, plugins and solvers for the new SDK content
     loadTree();
     loadPlugins();
+    loadSolvers();
   } catch (e) {
     document.getElementById('update-banner-msg').innerHTML =
       `⚡ Reload failed: ${e.message}`;
@@ -932,6 +950,36 @@ async function loadPlugins() {
       sel.appendChild(opt);
     }
   } catch (e) { console.warn('Plugin fetch failed', e); }
+}
+
+// ── Solvers ────────────────────────────────────────────────────────────────
+// Labels are generic ("Solver 1", "Solver 2", …) — the server assigns them,
+// not the real backend names. "— default —" always means the registry's
+// own default (always "rejection" when present) — equivalent to omitting
+// --solver entirely.
+async function loadSolvers() {
+  try {
+    const res  = await fetch('/api/solvers');
+    const data = await res.json();
+    const solvers = data.solvers || [];
+    const sel = document.getElementById('solver-select');
+    if (solvers.length === 0) {
+      // Old/pre-flag binary, or no backends reported — fall back to
+      // omitting --solver entirely (registry picks its own default).
+      sel.innerHTML = '<option value="">— default —</option>';
+      return;
+    }
+    // Real list came back — "Solver 1 (default)" already carries the
+    // "use the default" meaning, so no separate placeholder is needed;
+    // it's sorted first by the server and so is selected by default.
+    sel.innerHTML = '';
+    for (const s of solvers) {
+      const opt = document.createElement('option');
+      opt.value = s.name;
+      opt.textContent = s.label;
+      sel.appendChild(opt);
+    }
+  } catch (e) { console.warn('Solver fetch failed', e); }
 }
 
 // ── Open file ──────────────────────────────────────────────────────────────

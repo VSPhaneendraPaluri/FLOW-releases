@@ -4,7 +4,7 @@ const express   = require('express');
 const path      = require('path');
 const fs        = require('fs');
 const os        = require('os');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -39,6 +39,7 @@ function findBinary(root, candidates) {
 }
 
 function detectBinaries() {
+    _solversCache = null; // compiled-in backends may differ after an SDK reload
     FLOW_BIN = findBinary(SDK_ROOT, isWin
         ? ['flow-cli-windows-x86_64.exe', 'flow.exe', 'flow-cli.exe']
         : ['flow-cli-linux-x86_64', 'flow-linux-x86_64', 'flow-cli', 'flow']);
@@ -521,6 +522,42 @@ app.get('/api/plugins', (_req, res) => {
     res.json({ plugins: found });
 });
 
+// ── API: solvers ───────────────────────────────────────────────────────────
+// Asks the loaded flow-cli binary which constraint-solver backends were
+// compiled into THIS build (--list-solvers; see tools/cli/main.cpp). Labels
+// are intentionally generic ("Solver 1", "Solver 2", …) rather than the
+// real backend names — the dropdown order always puts the registry default
+// (always "rejection" when present) first, matching --list-solvers' own
+// output order. Cached after the first successful call since the set of
+// compiled-in backends can't change without a restart.
+let _solversCache = null;
+app.get('/api/solvers', (_req, res) => {
+    if (_solversCache) return res.json({ solvers: _solversCache });
+    if (!FLOW_BIN) return res.json({ solvers: [] });
+    try {
+        const result = spawnSync(FLOW_BIN, ['--list-solvers'], { encoding: 'utf8', timeout: 5000 });
+        // Each line is "<name>" or "<name> *" (trailing " *" marks the
+        // registry's actual default — see tools/cli/main.cpp). Parse that
+        // marker explicitly rather than assuming the default is first.
+        const parsed = (result.stdout || '')
+            .split('\n')
+            .map(s => s.trim())
+            .filter(Boolean)
+            .map(line => {
+                const isDefault = line.endsWith('*');
+                const name = (isDefault ? line.slice(0, -1) : line).trim();
+                return { name, isDefault };
+            });
+        // Default first, then everything else in the order the CLI reported.
+        parsed.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0));
+        _solversCache = parsed.map((s, i) =>
+            ({ name: s.name, label: `Solver ${i + 1}${s.isDefault ? ' (default)' : ''}` }));
+        res.json({ solvers: _solversCache });
+    } catch (e) {
+        res.json({ solvers: [] });
+    }
+});
+
 // ── SSE helpers ────────────────────────────────────────────────────────────
 function sseStart(res) {
     res.setHeader('Content-Type',  'text/event-stream');
@@ -625,7 +662,7 @@ app.post('/api/run', (req, res) => {
         sseMsg(res, 'stderr', 'No FLOW binary found in sdk/bin/.\n');
         return sseDone(res, 1);
     }
-    const { script, pluginPath, scriptPath } = req.body;
+    const { script, pluginPath, scriptPath, solver } = req.body;
     if (!script) { sseMsg(res, 'stderr', 'No script content.\n'); return sseDone(res, 1); }
     if (!pluginPath) { sseMsg(res, 'stderr', 'No plugin selected. Choose an ISA plugin from the Plugin drop-down before running.\n'); return sseDone(res, 1); }
 
@@ -640,6 +677,7 @@ app.post('/api/run', (req, res) => {
         args.push('--plugin', path.isAbsolute(pluginPath)
             ? pluginPath : path.join(SDK_ROOT, pluginPath));
     }
+    if (solver) args.push('--solver', solver);
     args.push(tmp);
     const displayNameRun = scriptPath ? path.basename(scriptPath) : path.basename(tmp);
     sseMsg(res, 'info',
@@ -680,20 +718,20 @@ app.post('/api/validate', (req, res) => {
     if (!FLOW_BIN && !VALID_BIN) {
         sseMsg(res, 'stderr', 'No FLOW binary found.\n'); return sseDone(res, 1);
     }
-    const { script, pluginPath, scriptPath } = req.body;
+    const { script, pluginPath, scriptPath, solver } = req.body;
     const temp = writeTempScript(script || '', scriptPath, '_flow_val');
     const { tmp, dir, uniq, stem } = temp;
     const cwd = dir;
 
     const bin  = VALID_BIN || FLOW_BIN;
-    // flow-validate takes just the script; flow-cli has no --validate flag —
-    // run the script normally (parse + ISA check) using the same plugin the
-    // Run panel would use, then treat any non-zero exit as a validation error.
+    // flow-validate takes just the script and no other flags — --plugin and
+    // --solver only apply when falling back to the full flow-cli binary.
     const args = [];
     if (!VALID_BIN && pluginPath) {
         args.push('--plugin', path.isAbsolute(pluginPath)
             ? pluginPath : path.join(SDK_ROOT, pluginPath));
     }
+    if (!VALID_BIN && solver) args.push('--solver', solver);
     args.push(tmp);
     const displayNameVal = scriptPath ? path.basename(scriptPath) : path.basename(tmp);
     sseMsg(res, 'info',
